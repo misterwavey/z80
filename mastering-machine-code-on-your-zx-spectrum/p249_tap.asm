@@ -1,10 +1,15 @@
- ; ================================================================
-;	Example source for target 'tap'
-;	Tape file for ZX Spectrum and Jupiter ACE
-;	Copyright  (c)	Günter Woigk 1994 - 2015
-;					mailto:kio@little-bat.de
-; ================================================================
+; ==================================================================
+; breakout from p249 of 'mastering machine code on your zx Spectrum'
+; by toni baker 1983
 
+; corrections by stuart martin 2016
+;   o line 222 + 348 was 'LD L, 11' fixed to 'LD HL, SCORE'
+;   o UDG graphic A programmatically added
+;
+; assembled using zasm 4.0:
+; 	zasm -u p81_tap.asm
+; .tap output file tested on fuse spectrum emulator on OS X
+; ==================================================================
 
 ; fill byte is $00
 ; #code has an additional argument: the sync byte for the block.
@@ -12,9 +17,7 @@
 ; Note: If a segment is appended without an explicite address, then the sync byte and the checksum byte
 ; of the preceding segment are not counted when calculating the start address of this segment.
 
-
 #target tap
-
 
 ; sync bytes:
 headerflag:     equ 0
@@ -342,7 +345,7 @@ CARRY
 	JR CARRY
 INC
 	LD (HL),A 				;Store digit.
-	LD HL,SCORE 			;Point HL to the label SCORE.
+	LD HL,SCORE 			;Point HL to the label SCORE. !!! was LD L, 11 !!!
 	LD B,$0C
 PRINT_SCORE_2
 	LD A,(HL)
@@ -471,15 +474,6 @@ SCORE
 	DEFM ink_control,colour_white
 	DEFM paper_control,colour_black
 	DEFS $05 				;Space in which to store current score.
-
-; AT_0_0
-; 	PUSH HL
-; 	LD HL,4000
-; 	LD (DF_CC),HL
-; 	LD HL,1821
-; 	LD (S_POSN),HL
-; 	POP HL
-; 	RET
 
 AT_15_A
 	PUSH AF
