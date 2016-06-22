@@ -7,7 +7,7 @@
 ;   o UDG graphic A programmatically added
 ;
 ; assembled using zasm 4.0:
-; 	zasm -u p81_tap.asm
+; 	zasm -u p249_tap.asm
 ; .tap output file tested on fuse spectrum emulator on OS X
 ; ==================================================================
 
