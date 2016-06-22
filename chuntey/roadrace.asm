@@ -1,5 +1,6 @@
 ; ====================================================================
 ;	Roadrace by gmail.com - atsign - jon.kingsman (reversed)
+;   part of chuntey's z80 blog http://chuntey.arjunnair.in/?cat=62
 ;   wrapped in zasm's zx spectrum .tap template by stuart martin 2017
 ;   assemble using zasm 4:
 ;     zasm -u roadrace.asm
