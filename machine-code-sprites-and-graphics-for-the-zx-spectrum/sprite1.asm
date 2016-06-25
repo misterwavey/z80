@@ -179,28 +179,42 @@ LOOP
 	CP $26 					;Check for A key
 	JR NZ,CYCLE
 DOWN
-	CALL ERASE_SPRITE
 	LD A,(YPOS)
-	;CP $16
-	;JR Z,CYCLE				;can't move down any further
+	CP $14					;is Y at bottom? 20d (we're 2 tall)
+	JR Z,CYCLE				;yes. can't move down any further
+	PUSH AF
+	CALL ERASE_SPRITE
+	POP AF
 	ADD $1
 	LD (YPOS),A
 	JR MOVE_SPRITE_1
 LEFT
-	CALL ERASE_SPRITE
 	LD A,(XPOS)
+	CP $0					;is X at left?
+	JR Z,CYCLE				;yes. can't move left any further
+	PUSH AF
+	CALL ERASE_SPRITE
+	POP AF
 	SUB $1
 	LD (XPOS),A
 	JR MOVE_SPRITE_1
 RIGHT
-	CALL ERASE_SPRITE
 	LD A,(XPOS)
+	CP $1E					;is X at right? 30d
+	JR Z,CYCLE 				;yes. can't move right any further
+	PUSH AF
+	CALL ERASE_SPRITE
+	POP AF
 	ADD $1
 	LD (XPOS),A
 	JR MOVE_SPRITE_1
 UP
-	CALL ERASE_SPRITE
 	LD A,(YPOS)
+	CP $0					;is Y at top?
+	JR Z,CYCLE				;yes. can't move up any further
+	PUSH AF
+	CALL ERASE_SPRITE
+	POP AF
 	SUB $1
 	LD (YPOS),A
 
