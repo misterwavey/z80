@@ -88,7 +88,7 @@ KEY_CODE	equ $0333
 
 #code PROG_HEADER,0,17,headerflag
 		defb    0						; Indicates a Basic program
-		defb    "mloader   "			; the block name, 10 bytes long
+		defb    "sprite-p  "			; the block name, 10 bytes long
 		defw    variables_end-0			; length of block = length of basic program plus variables
 		defw    10		    			; line number for auto-start, 0x8000 if none
 		defw    program_end-0			; length of the basic program without variables
@@ -143,7 +143,7 @@ variables_end:
 
 #code CODE_HEADER,0,17,headerflag
 		defb    3						; Indicates binary data
-		defb    "mcode     "	  		; the block name, 10 bytes long
+		defb    "sprite-p-c"	  		; the block name, 10 bytes long
 		defw    code_end-code_start		; length of data block which follows
 		defw    code_start				; default location for the data
 		defw    0       				; unused
@@ -154,142 +154,46 @@ variables_end:
 ; Z80 assembler code and data
 
 	;; setup
-	LD HL,UDG_LOCAL_DATA    ;point to local UDG data
-	LD (UDGS),HL   			;tell system to use ours
+	; LD HL,UDG_LOCAL_DATA    ;point to local UDG data
+	; LD (UDGS),HL   			;tell system to use ours
+
+	LD A,0
+	LD (DF_SZ),A 			;set lower part of screen to 0 size so we get 24 lines
 
 	LD A,$2					;set printing to
 	CALL $1601				;top part of screen
 
-	LD A,$09
+	LD A,$50
 	LD (XPOS),A				;initial X
 	LD (YPOS),A				;initial Y
 
 	CALL PRINT_SPRITE
-LOOP
-	CALL KEY_SCAN
-	INC D
-	JR NZ,CYCLE 			;Don't move if more than one key pressed.
-	LD A,E 					;A: = key code of key pressed (FF if none).
-	CP $1A					;Check for O key
-	JR Z,LEFT
-	CP $22					;Check for P key
-	JR Z,RIGHT
-	CP $25					;Check for Q key
-	JR Z,UP
-	CP $26 					;Check for A key
-	JR NZ,CYCLE
-DOWN
-	LD A,(YPOS)
-	CP $14					;is Y at bottom? 20d (we're 2 tall)
-	JR Z,CYCLE				;yes. can't move down any further
-	PUSH AF
-	CALL ERASE_SPRITE
-	POP AF
-	ADD $1
-	LD (YPOS),A
-	JR MOVE_SPRITE_1
-LEFT
-	LD A,(XPOS)
-	CP $0					;is X at left?
-	JR Z,CYCLE				;yes. can't move left any further
-	PUSH AF
-	CALL ERASE_SPRITE
-	POP AF
-	SUB $1
-	LD (XPOS),A
-	JR MOVE_SPRITE_1
-RIGHT
-	LD A,(XPOS)
-	CP $1E					;is X at right? 30d
-	JR Z,CYCLE 				;yes. can't move right any further
-	PUSH AF
-	CALL ERASE_SPRITE
-	POP AF
-	ADD $1
-	LD (XPOS),A
-	JR MOVE_SPRITE_1
-UP
-	LD A,(YPOS)
-	CP $0					;is Y at top?
-	JR Z,CYCLE				;yes. can't move up any further
-	PUSH AF
-	CALL ERASE_SPRITE
-	POP AF
-	SUB $1
-	LD (YPOS),A
 
-MOVE_SPRITE_1
-	CALL PRINT_SPRITE
-CYCLE
-	JR LOOP
-
-ERASE_SPRITE
-	LD A,(YPOS)            	;
-	LD B,A					;
-	LD A,(XPOS)            	;
-	LD C,A					;BC := XPOS,YPOS
-	CALL AT_X_Y				;print AT
-	LD A,space			;udg 'A'
-	RST $10 				;PRINT udg
-	LD A,(XPOS)				;
-	ADD $1		           	;
-	LD C,A					;BC := X+1,Y
-	CALL AT_X_Y				;print AT
-	LD A,space			;udg 'B'
-	RST $10 				;PRINT udg
-	LD A,(YPOS)
-	ADD $1
-	LD B,A	            	;BC:=X+1,Y+1
-	CALL AT_X_Y				;print AT
-	LD A,space			;udg 'D'
-	RST $10 				;PRINT udg
-	LD A,(XPOS)
-	LD C,A		            ;
-	LD A,(YPOS)
-	ADD $1
-	LD B,A            		;BC:=X,Y+1
-	CALL AT_X_Y				;print AT
-	LD A,space			;udg 'C'
-	RST $10 				;PRINT udg
+	;; teardown
+	LD A,2
+	LD (DF_SZ),A 			;restore 2 lines input at bottom
 	RET
 
 PRINT_SPRITE
-	LD A,(YPOS)            	;
-	LD B,A					;
-	LD A,(XPOS)            	;
-	LD C,A					;BC := YPOS,XPOS
-	CALL AT_X_Y				;print AT
-	LD A,graphic_A			;udg 'A'
-	RST $10 				;PRINT udg
-	LD A,(XPOS)				;
-	ADD $1		           	;
-	LD C,A					;BC := Y,X+1
-	CALL AT_X_Y				;print AT
-	LD A,graphic_B			;udg 'B'
-	RST $10 				;PRINT udg
+	LD DE,UDG_LOCAL_DATA	;our USGs start addr
 	LD A,(YPOS)
-	ADD $1
-	LD B,A	            	;BC:=Y+1,X+1
-	CALL AT_X_Y				;print AT
-	LD A,graphic_C			;udg 'C'
-	RST $10 				;PRINT udg
+	LD B,A
 	LD A,(XPOS)
-	LD C,A		            ;
-	LD A,(YPOS)
-	ADD $1
-	LD B,A            		;BC:=Y+1,X
-	CALL AT_X_Y				;print AT
-	LD A,graphic_D			;udg 'D'
-	RST $10 				;PRINT udg
-	RET
-
-AT_X_Y
-	LD A,at_control
-	RST $10
-	LD A,B 					;First AT co-ordinate.
-	RST $10
-	LD A,C 					;Second AT co-ordinate.
-	RST $10
+	LD C,A 					;BC:=Y,X
+	EXX						;swap to protect BC
+	LD B,08					;num bytes in UDG character
+EACH_BYTE_IN_CHAR
+	EXX						;back to normal regs
+	PUSH BC					;?
+	call $22AA				;PIXEL_ADDRESS system routine
+	LD A,(DE)				;A:= byte N of char
+	LD (HL),A				;display byte N on screen
+	INC DE					;next byte in char
+	POP BC					;?
+	DEC B					;BC:=Y-1,X
+	EXX
+	DJNZ EACH_BYTE_IN_CHAR
+	EXX
 	RET
 
 XPOS	defb 0
