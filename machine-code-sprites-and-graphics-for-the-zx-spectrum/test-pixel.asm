@@ -167,34 +167,134 @@ variables_end:
 	LD (XPOS),A				;initial X
 	LD (YPOS),A				;initial Y
 
+	CALL REARRANGE_9_UDGS
+	LD B,$10
+LOOP
+	PUSH BC
+	CALL ROTATE_SPRITE_TO_RIGHT
 	CALL PRINT_SPRITE
+	LD A, (XPOS)
+	INC A
+	LD (XPOS), A
+	POP BC
+	DEC B
+	JP NZ,LOOP
 
 	;; teardown
-	LD A,2
+	LD A,$02
 	LD (DF_SZ),A 			;restore 2 lines input at bottom
 	RET
 
+REARRANGE_9_UDGS
+	LD HL,printer_buffer	;scratch area for rotated chars
+	PUSH HL
+	XOR A
+	LD B,A					;B:=0 becomes 255 when decremented
+CLEAR_PRN_BUF				;so visits all 265 bytes in printer buffer
+	LD (HL),A				;set to 0
+	INC HL
+	DJNZ CLEAR_PRN_BUF
+	POP DE					;DE:=printer_buffer
+	; LD HL,UDG_LOCAL_DATA
+	LD HL,(UDGS)			;UDG area
+	LD B,$03				;3 groups of chars
+GROUP_LOOP
+	PUSH BC
+	LD C,$08				;3 consecutive chars
+CONSECUTIVE_CHARS
+	LD B,03
+	PUSH HL
+BYTES_LOOP
+	LD A,(HL)
+	LD (DE),A
+	PUSH BC
+	LD BC,$0008
+	ADD HL,BC
+	POP BC
+	INC DE
+	DJNZ BYTES_LOOP
+	INC DE
+	POP HL
+	INC HL					;select next char
+	DEC C
+	JR NZ, CONSECUTIVE_CHARS
+	LD C,$10				;b is already 0
+	ADD HL,BC				;select next group
+	POP BC
+	DJNZ GROUP_LOOP
+	RET
+
+ROTATE_SPRITE_TO_RIGHT
+	;; setup sprite X,Y
+	LD A,(YPOS)            	;
+	LD B,A					;
+	LD A,(XPOS)            	;
+	LD C,A					;BC := YPOS,XPOS
+	PUSH BC
+	LD DE,printer_buffer
+	CALL $22AA
+	LD C,A					;C:=number of rotates
+	AND A					;check for zero
+	JR Z,SKIP_ROTATE		;no rotate needed
+ROTATE_ALL_CHARS_ONCE
+	PUSH DE
+	LD B,$60				;3x3 sprite but 4 bytes wide = 12 * 8 = 92
+ROTATE_ONE_CHAR
+	LD A,(DE)
+	RRA
+	LD (DE),A
+	INC DE
+	DJNZ ROTATE_ONE_CHAR
+	POP DE
+	DEC C					;need to rotate again?
+	JR NZ, ROTATE_ALL_CHARS_ONCE
+SKIP_ROTATE
+	POP BC
+	RET
+
 PRINT_SPRITE
-	LD DE,UDG_LOCAL_DATA	;our USGs start addr
-	LD A,(YPOS)
-	LD B,A
-	LD A,(XPOS)
-	LD C,A 					;BC:=Y,X
-	EXX						;swap to protect BC
-	LD B,08					;num bytes in UDG character
-EACH_BYTE_IN_CHAR
-	EXX						;back to normal regs
-	PUSH BC					;?
-	call $22AA				;PIXEL_ADDRESS system routine
-	LD A,(DE)				;A:= byte N of char
-	LD (HL),A				;display byte N on screen
-	INC DE					;next byte in char
-	POP BC					;?
-	DEC B					;BC:=Y-1,X
+	LD IX,$5B00
 	EXX
-	DJNZ EACH_BYTE_IN_CHAR
+	LD B,$18				;3x8 pixel lines
+EACH_BYTE_IN_CHAR_Y
+	EXX
+	PUSH BC
+	CALL $22AA				;PIXEL_ADD
+	LD B,$04				;sprite width=4
+EACH_CHAR_IN_SPRITE
+	LD A,(IX)
+	LD (HL),A
+	INC HL
+	INC IX
+	DJNZ EACH_CHAR_IN_SPRITE
+	POP BC
+	DEC B
+	EXX
+	DJNZ EACH_BYTE_IN_CHAR_Y
 	EXX
 	RET
+
+; PRINT_SPRITE_Y_POS_ONLY
+; 	LD DE,UDG_LOCAL_DATA	;our USGs start addr
+; 	LD A,(YPOS)
+; 	LD B,A
+; 	LD A,(XPOS)
+; 	LD C,A 					;BC:=Y,X
+; 	EXX						;swap to protect BC
+; 	LD B,08					;num bytes in UDG character
+; EACH_BYTE_IN_CHAR_Y_OLD
+; 	EXX						;back to normal regs
+; 	PUSH BC					;?
+; 	call $22AA				;PIXEL_ADDRESS system routine
+; 	LD A,(DE)				;A:= byte N of char
+; 	LD (HL),A				;display byte N on screen
+; 	INC DE					;next byte in char
+; 	POP BC					;?
+; 	DEC B					;BC:=Y-1,X
+; 	EXX
+; 	DJNZ EACH_BYTE_IN_CHAR_Y_OLD
+; 	EXX
+; 	RET
 
 XPOS	defb 0
 YPOS	defb 0
