@@ -154,32 +154,43 @@ variables_end:
 ; Z80 assembler code and data
 
 	;; setup
-	; LD HL,UDG_LOCAL_DATA    ;point to local UDG data
-	; LD (UDGS),HL   			;tell system to use ours
-
 	LD A,0
 	LD (DF_SZ),A 			;set lower part of screen to 0 size so we get 24 lines
 
 	LD A,$2					;set printing to
 	CALL $1601				;top part of screen
 
-	LD A,$50
+	LD A,$20
 	LD (XPOS),A				;initial X
 	LD (YPOS),A				;initial Y
 
-	CALL REARRANGE_9_UDGS
-	LD B,$10
 LOOP
-	PUSH BC
+	LD D,$80				; move N times
+MOVE_SPRITE_FWD
+	PUSH DE
+	CALL REARRANGE_9_UDGS
 	CALL ROTATE_SPRITE_TO_RIGHT
 	CALL PRINT_SPRITE
-	LD A, (XPOS)
-	INC A
-	LD (XPOS), A
-	POP BC
-	DEC B
-	JP NZ,LOOP
+	LD A,(XPOS)
+	inc a
+	LD (XPOS),A
+	POP DE
+	DEC D
+	JP NZ,MOVE_SPRITE_FWD
 
+	LD D,$80				; move N times
+MOVE_SPRITE_BACK
+	PUSH DE
+	CALL REARRANGE_9_UDGS
+	CALL ROTATE_SPRITE_TO_RIGHT
+	CALL PRINT_SPRITE
+	LD A,(XPOS)
+	dec a
+	LD (XPOS),A
+	POP DE
+	DEC D
+	JP NZ,MOVE_SPRITE_BACK
+	JP LOOP
 	;; teardown
 	LD A,$02
 	LD (DF_SZ),A 			;restore 2 lines input at bottom
@@ -195,14 +206,14 @@ CLEAR_PRN_BUF				;so visits all 265 bytes in printer buffer
 	INC HL
 	DJNZ CLEAR_PRN_BUF
 	POP DE					;DE:=printer_buffer
-	; LD HL,UDG_LOCAL_DATA
-	LD HL,(UDGS)			;UDG area
-	LD B,$03				;3 groups of chars
+	LD HL,UDG_LOCAL_DATA	;our UDG area
+	; LD HL,(UDGS)	;our UDG area
+	LD B,$02				;3 groups of chars
 GROUP_LOOP
 	PUSH BC
-	LD C,$08				;3 consecutive chars
+	LD C,$08				;8 bytes per char
 CONSECUTIVE_CHARS
-	LD B,03
+	LD B,$02					;3 consecutive chars
 	PUSH HL
 BYTES_LOOP
 	LD A,(HL)
@@ -236,31 +247,35 @@ ROTATE_SPRITE_TO_RIGHT
 	LD C,A					;C:=number of rotates
 	AND A					;check for zero
 	JR Z,SKIP_ROTATE		;no rotate needed
-ROTATE_ALL_CHARS_ONCE
+ROTATE_NEXT_SPRITE_CHAR
 	PUSH DE
-	LD B,$60				;3x3 sprite but 4 bytes wide = 12 * 8 = 92
-ROTATE_ONE_CHAR
+	LD B,$30				;3x3d sprite but 4d bytes wide = 12d * 8d = 92d = $60
+ROTATE_ONE_CHAR_N_TIMES
 	LD A,(DE)
 	RRA
 	LD (DE),A
 	INC DE
-	DJNZ ROTATE_ONE_CHAR
+	DJNZ ROTATE_ONE_CHAR_N_TIMES
 	POP DE
 	DEC C					;need to rotate again?
-	JR NZ, ROTATE_ALL_CHARS_ONCE
+	JR NZ, ROTATE_NEXT_SPRITE_CHAR
 SKIP_ROTATE
 	POP BC
 	RET
 
 PRINT_SPRITE
-	LD IX,$5B00
+	LD A,(YPOS)            	;
+	LD B,A					;
+	LD A,(XPOS)            	;
+	LD C,A					;BC := YPOS,XPOS
+	LD IX,printer_buffer
 	EXX
-	LD B,$18				;3x8 pixel lines
+	LD B,$10				;$18=24d = 3x8 pixel lines
 EACH_BYTE_IN_CHAR_Y
 	EXX
 	PUSH BC
 	CALL $22AA				;PIXEL_ADD
-	LD B,$04				;sprite width=4
+	LD B,$03				;sprite width=4
 EACH_CHAR_IN_SPRITE
 	LD A,(IX)
 	LD (HL),A
@@ -273,28 +288,6 @@ EACH_CHAR_IN_SPRITE
 	DJNZ EACH_BYTE_IN_CHAR_Y
 	EXX
 	RET
-
-; PRINT_SPRITE_Y_POS_ONLY
-; 	LD DE,UDG_LOCAL_DATA	;our USGs start addr
-; 	LD A,(YPOS)
-; 	LD B,A
-; 	LD A,(XPOS)
-; 	LD C,A 					;BC:=Y,X
-; 	EXX						;swap to protect BC
-; 	LD B,08					;num bytes in UDG character
-; EACH_BYTE_IN_CHAR_Y_OLD
-; 	EXX						;back to normal regs
-; 	PUSH BC					;?
-; 	call $22AA				;PIXEL_ADDRESS system routine
-; 	LD A,(DE)				;A:= byte N of char
-; 	LD (HL),A				;display byte N on screen
-; 	INC DE					;next byte in char
-; 	POP BC					;?
-; 	DEC B					;BC:=Y-1,X
-; 	EXX
-; 	DJNZ EACH_BYTE_IN_CHAR_Y_OLD
-; 	EXX
-; 	RET
 
 XPOS	defb 0
 YPOS	defb 0
