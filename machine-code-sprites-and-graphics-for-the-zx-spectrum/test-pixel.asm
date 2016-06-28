@@ -206,7 +206,7 @@ LEFT
 	JR MOVE_SPRITE_1
 RIGHT
 	LD A,(XPOS)
-	CP $1E					;is X at right? 30d
+	CP $E7					;is X at right? 30d
 	JR Z,CYCLE 				;yes. can't move right any further
 	PUSH AF
 	CALL ERASE_SPRITE
