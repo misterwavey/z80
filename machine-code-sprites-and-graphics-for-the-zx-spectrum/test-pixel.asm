@@ -216,7 +216,7 @@ RIGHT
 	JR MOVE_SPRITE_1
 UP
 	LD A,(YPOS)
-	CP $0					;is Y at top?
+	CP $10					;is Y at top?
 	JR Z,CYCLE				;yes. can't move up any further
 	PUSH AF
 	CALL ERASE_SPRITE
@@ -226,12 +226,6 @@ UP
 MOVE_SPRITE_1
 	CALL PRINT_SPRITE
 CYCLE
-	LD HL,$1000				;delay size
-DELAY
-	DEC HL 					;This is a short delay loop which controls
-	LD A,H 					;the speed of the game.
-	OR L
-	JR NZ,DELAY
 	JR LOOP
 	RET
 
