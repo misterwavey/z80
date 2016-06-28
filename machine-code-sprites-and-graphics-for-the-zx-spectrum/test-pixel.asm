@@ -163,37 +163,76 @@ variables_end:
 	LD A,$20
 	LD (XPOS),A				;initial X
 	LD (YPOS),A				;initial Y
+	CALL PRINT_SPRITE
 
 LOOP
-	LD D,$80				; move N times
-MOVE_SPRITE_FWD
-	PUSH DE
-	CALL REARRANGE_9_UDGS
-	CALL ROTATE_SPRITE_TO_RIGHT
-	CALL PRINT_SPRITE
+	CALL KEY_SCAN
+	INC D
+	JR NZ,CYCLE 			;Don't move if more than one key pressed.
+	LD A,E 					;A: = key code of key pressed (FF if none).
+	CP $1A					;Check for O key
+	JR Z,LEFT
+	CP $22					;Check for P key
+	JR Z,RIGHT
+	CP $25					;Check for Q key
+	JR Z,UP
+	CP $26 					;Check for A key
+	JR Z,DOWN
+	CP $27					;Check for capshift (left shift on mac) key
+	JR NZ,CYCLE				;no match? loop again. otherwise fall through
+QUIT
+	LD A,$2
+	LD (DF_SZ),A 			;restore lower part of screen to 2
+	RET						;return to BASIC
+DOWN
+	LD A,(YPOS)
+	CP $15					;is Y at bottom? 20d (we're 2 tall)
+	JR Z,CYCLE				;yes. can't move down any further
+	PUSH AF
+	CALL ERASE_SPRITE
+	POP AF
+	SUB $1
+	LD (YPOS),A
+	JR MOVE_SPRITE_1
+LEFT
 	LD A,(XPOS)
-	inc a
+	CP $0					;is X at left?
+	JR Z,CYCLE				;yes. can't move left any further
+	PUSH AF
+	CALL ERASE_SPRITE
+	POP AF
+	SUB $1
 	LD (XPOS),A
-	POP DE
-	DEC D
-	JP NZ,MOVE_SPRITE_FWD
-
-	LD D,$80				; move N times
-MOVE_SPRITE_BACK
-	PUSH DE
-	CALL REARRANGE_9_UDGS
-	CALL ROTATE_SPRITE_TO_RIGHT
-	CALL PRINT_SPRITE
+	JR MOVE_SPRITE_1
+RIGHT
 	LD A,(XPOS)
-	dec a
+	CP $1E					;is X at right? 30d
+	JR Z,CYCLE 				;yes. can't move right any further
+	PUSH AF
+	CALL ERASE_SPRITE
+	POP AF
+	ADD $1
 	LD (XPOS),A
-	POP DE
-	DEC D
-	JP NZ,MOVE_SPRITE_BACK
-	JP LOOP
-	;; teardown
-	LD A,$02
-	LD (DF_SZ),A 			;restore 2 lines input at bottom
+	JR MOVE_SPRITE_1
+UP
+	LD A,(YPOS)
+	CP $0					;is Y at top?
+	JR Z,CYCLE				;yes. can't move up any further
+	PUSH AF
+	CALL ERASE_SPRITE
+	POP AF
+	ADD $1
+	LD (YPOS),A
+MOVE_SPRITE_1
+	CALL PRINT_SPRITE
+CYCLE
+	LD HL,$1000				;delay size
+DELAY
+	DEC HL 					;This is a short delay loop which controls
+	LD A,H 					;the speed of the game.
+	OR L
+	JR NZ,DELAY
+	JR LOOP
 	RET
 
 REARRANGE_9_UDGS
@@ -263,7 +302,7 @@ SKIP_ROTATE
 	POP BC
 	RET
 
-PRINT_SPRITE
+DISPLAY_SPRITE
 	LD A,(YPOS)            	;
 	LD B,A					;
 	LD A,(XPOS)            	;
@@ -287,6 +326,15 @@ EACH_CHAR_IN_SPRITE
 	EXX
 	DJNZ EACH_BYTE_IN_CHAR_Y
 	EXX
+	RET
+
+PRINT_SPRITE
+	CALL REARRANGE_9_UDGS
+	CALL ROTATE_SPRITE_TO_RIGHT
+	CALL DISPLAY_SPRITE
+	RET
+
+ERASE_SPRITE
 	RET
 
 XPOS	defb 0
