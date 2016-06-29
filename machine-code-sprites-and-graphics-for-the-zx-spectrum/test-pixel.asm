@@ -278,12 +278,12 @@ CLEAR_PRN_BUF				;so visits all 265 bytes in printer buffer
 	pop de					;de:=printer_buffer
 	ld hl,UDG_LOCAL_DATA	;our UDG area
 	; ld hl,(UDGS)	;our UDG area
-	ld b,$02				;3 groups of chars
+	ld b,$04				;2 groups of chars + 2 groups of matte
 GROUP_LOOP
 	push bc
 	ld c,$08				;8 bytes per char
 CONSECUTIVE_CHARS
-	ld b,$02					;3 consecutive chars
+	ld b,$02				;2 consecutive chars in our sprite
 	push hl
 BYTES_LOOP
 	ld a,(hl)
@@ -319,7 +319,9 @@ ROTATE_SPRITE_TO_RIGHT
 	jr z,SKIP_ROTATE		;no rotate needed
 ROTATE_NEXT_SPRITE_CHAR
 	push de
-	ld b,$30				;3x3d sprite but 4d bytes wide = 12d * 8d = 92d = $60
+	;ld b,$60				;3x3d sprite but 4d bytes wide = 12d * 8d = 92d = $60
+	ld b,$60				;2x2d sprite but 3d bytes wide = 6d * 8d = 48d = $30
+							;x2 for matte = $60
 ROTATE_ONE_CHAR_N_TIMES
 	ld a,(de)
 	rra
@@ -338,6 +340,7 @@ DISPLAY_SPRITE
 	ld b,a					;
 	ld a,(XPOS)            	;
 	ld c,a					;bc := ypos,xpos
+	ld de,$9800				;offset for displayfile copy
 	ld ix,PRINTER_BUFFER
 	exx
 	ld b,$10				;$18=24d = 3x8 pixel lines
@@ -345,9 +348,17 @@ EACH_BYTE_IN_CHAR_Y
 	exx
 	push bc
 	call $22aa				;pixel_add
-	ld b,$03				;sprite width=4
+	ld b,$03				;sprite width=3
 EACH_CHAR_IN_SPRITE
-	ld a,(ix)
+	push hl
+	ld a,(ix+48d)
+	cpl
+	and (hl)
+	ld c,a
+	ld a,(ix+48d)
+	and (ix)
+	or c
+	pop hl
 	ld (hl),a
 	inc hl
 	inc ix
