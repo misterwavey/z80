@@ -1,11 +1,11 @@
 ; =======================================================================
-;	pixel sprite code largely taken from
-;	'machine code sprites and graphics for the zx spectrum' by john durst
+;  pixel sprite code largely taken from
+;  'machine code sprites and graphics for the zx spectrum' by john durst
 ;
-;   assemble using zasm 4 to create a .tap file:
-;     zasm -u test-pixel.asm
+;  assemble using zasm 4 to create a .tap file:
+;    zasm -u test-pixel.asm
 ;
-;   for other assemblers remove all lines up until 113
+;  for other assemblers remove all lines from 1 to up until around 113
 ; =======================================================================
 
 ; fill byte is 0x00
@@ -17,22 +17,22 @@
 #target tap
 
 ; sync bytes:
-HEADERFLAG:     equ 0
-DATAFLAG:       equ $ff
+HEADERFLAG:         equ 0
+DATAFLAG:           equ $ff
 
 ; some Basic tokens:
-tCLEAR		equ     $FD             ; token CLEAR
-tLOAD		equ     $EF             ; token LOAD
-tCODE		equ     $AF             ; token CODE
-tPRINT		equ     $F5             ; token PRINT
-tRANDOMIZE	equ     $F9             ; token RANDOMIZE
-tUSR		equ     $C0             ; token USR
-tCLS 		equ		$FB				; token CLS
+tCLEAR              equ     $FD         ; token CLEAR
+tLOAD               equ     $EF         ; token LOAD
+tCODE               equ     $AF         ; token CODE
+tPRINT              equ     $F5         ; token PRINT
+tRANDOMIZE          equ     $F9         ; token RANDOMIZE
+tUSR                equ     $C0         ; token USR
+tCLS                equ     $FB         ; token CLS
 
 ; ---------------------------------------------------
-;		ram-based, non-initialized variables
-;		(note: 0x5B00 is the printer buffer)
-;		(note: system variables at 0x5C00 were initialized by Basic)
+;        ram-based, non-initialized variables
+;        (note: 0x5B00 is the printer buffer)
+;        (note: system variables at 0x5C00 were initialized by Basic)
 ; ---------------------------------------------------
 
 #data VARIABLES, PRINTER_BUFFER, 0x100
@@ -40,20 +40,20 @@ tCLS 		equ		$FB				; token CLS
 ; define some variables here
 
 ; ---------------------------------------------------
-;		a Basic Loader:
+;        a Basic Loader:
 ; ---------------------------------------------------
 
 #code PROG_HEADER,0,17,HEADERFLAG
-		defb    0						; Indicates a Basic program
-		defb    "sprite-p  "			; the block name, 10 bytes long
-		defw    VARIABLES_END-0			; length of block = length of basic program plus variables
-		defw    10		    			; line number for auto-start, 0x8000 if none
-		defw    PROGRAM_END-0			; length of the basic program without variables
+        defb    0                       ; Indicates a Basic program
+        defb    "sprite-p  "            ; the block name, 10 bytes long
+        defw    VARIABLES_END-0         ; length of block = length of basic program plus variables
+        defw    10                      ; line number for auto-start, 0x8000 if none
+        defw    PROGRAM_END-0           ; length of the basic program without variables
 
 
 #code PROG_DATA,0,*,DATAFLAG
 
-		; ZX Spectrum Basic tokens
+        ; ZX Spectrum Basic tokens
 
 ; 10 CLEAR 23999
         defb    0,10                    ; line number
@@ -75,7 +75,7 @@ END20:  defb    $0d                     ; line end marker
         defb    0,30                    ; line number
         defb    END30-($+1)             ; line length
         defb    0                       ; statement number
-        defb    tCLS		         	; token RANDOMIZE, token USR
+        defb    tCLS                    ; token RANDOMIZE, token USR
 END30:  defb    $0d                     ; line end marker
 
 ; 40 PRINT USR 24000
@@ -88,20 +88,20 @@ END40:  defb    $0d                     ; line end marker
 
 PROGRAM_END:
 
-		; ZX Spectrum Basic variables
+        ; ZX Spectrum Basic variables
 
 VARIABLES_END:
 
 ; ---------------------------------------------------
-;		a machine code block:
+;        a machine code block:
 ; ---------------------------------------------------
 
 #code CODE_HEADER,0,17,HEADERFLAG
-	defb    3						; Indicates binary data
-	defb    "sprite-p-c"	  		; the block name, 10 bytes long
-	defw    CODE_END-CODE_START		; length of data block which follows
-	defw    CODE_START				; default location for the data
-	defw    0       				; unused
+        defb    3                       ; Indicates binary data
+        defb    "sprite-p-c"            ; the block name, 10 bytes long
+        defw    CODE_END-CODE_START     ; length of data block which follows
+        defw    CODE_START              ; default location for the data
+        defw    0                       ; unused
 
 #code CODE_DATA, CODE_START,*,DATAFLAG
 
@@ -118,330 +118,330 @@ VARIABLES_END:
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-		call INIT_SCREEN
-		call PRINT_SPRITE
+        call INIT_SCREEN
+        call PRINT_SPRITE
 GAME_LOOP
-		call KEY_SCAN
-		inc d
-		jr nz,CYCLE 			;Don't move if more than one key pressed.
-		ld a,e 					;a: = key code of key pressed (ff if none).
-		cp $1a					;check for o key
-		jr z,HANDLE_LEFT
-		cp $22					;check for p key
-		jr z,HANDLE_RIGHT
-		cp $25					;check for q key
-		jr z,HANDLE_UP
-		cp $26 					;check for a key
-		jr z,HANDLE_DOWN
-		cp $27					;check for capshift (left shift on mac) key
-		jr nz,CYCLE				;no match? loop again. otherwise fall through
+        call KEY_SCAN
+        inc d
+        jr nz,CYCLE                     ;Don't move if more than one key pressed.
+        ld a,e                          ;a: = key code of key pressed (ff if none).
+        cp $1a                          ;check for o key
+        jr z,HANDLE_LEFT
+        cp $22                          ;check for p key
+        jr z,HANDLE_RIGHT
+        cp $25                          ;check for q key
+        jr z,HANDLE_UP
+        cp $26                          ;check for a key
+        jr z,HANDLE_DOWN
+        cp $27                          ;check for capshift (left shift on mac) key
+        jr nz,CYCLE                     ;no match? loop again. otherwise fall through
 HANDLE_QUIT
-		ld a,$2
-		ld (DF_SZ),a 			;restore lower part of screen to 2
-		ret						;return to BASIC
+        ld a,$2
+        ld (DF_SZ),a                    ;restore lower part of screen to 2
+        ret                             ;return to BASIC
 HANDLE_DOWN
-		ld a,(YPOS)
-		cp $28					;is y at bottom? 32d (we're 2 tall)
-		jr z,CYCLE				;yes. can't move down any further
-		ld (OLDY),a
-		sub a,$1
-		ld (YPOS),a
-		jr MOVE_SPRITE_1
+        ld a,(YPOS)
+        cp $28                          ;is y at bottom? 32d (we're 2 tall)
+        jr z,CYCLE                      ;yes. can't move down any further
+        ld (OLDY),a
+        sub a,$1
+        ld (YPOS),a
+        jr MOVE_SPRITE_1
 HANDLE_LEFT
-		ld a,(XPOS)
-		cp $0					;is x at left?
-		jr z,CYCLE				;yes. can't move left any further
-		ld (OLDX),a
-		sub a,$1
-		ld (XPOS),a
-		jr MOVE_SPRITE_1
+        ld a,(XPOS)
+        cp $0                           ;is x at left?
+        jr z,CYCLE                      ;yes. can't move left any further
+        ld (OLDX),a
+        sub a,$1
+        ld (XPOS),a
+        jr MOVE_SPRITE_1
 HANDLE_RIGHT
-		ld a,(XPOS)
-		cp $e7					;is x at right? 30d
-		jr z,CYCLE 				;yes. can't move right any further
-		ld (OLDX),a
-		add a,$1
-		ld (XPOS),a
-		jr MOVE_SPRITE_1
+        ld a,(XPOS)
+        cp $e7                          ;is x at right? 30d
+        jr z,CYCLE                      ;yes. can't move right any further
+        ld (OLDX),a
+        add a,$1
+        ld (XPOS),a
+        jr MOVE_SPRITE_1
 HANDLE_UP
-		ld a,(YPOS)
-		cp $10					;is y at top?
-		jr z,CYCLE				;yes. can't move up any further
-		ld (OLDY),a
-		add a,$1
-		ld (YPOS),a
+        ld a,(YPOS)
+        cp $10                          ;is y at top?
+        jr z,CYCLE                      ;yes. can't move up any further
+        ld (OLDY),a
+        add a,$1
+        ld (YPOS),a
 MOVE_SPRITE_1
-		;halt
-		call PRINT_SPRITE
+        ;halt
+        call PRINT_SPRITE
 CYCLE
-		jr GAME_LOOP
+        jr GAME_LOOP
 
-		;;
-		;; subroutines
-		;;
+        ;;
+        ;; subroutines
+        ;;
 
 INIT_SCREEN
-		;; setup
-		ld a,0
-		ld (DF_SZ),a 			;set lower part of screen to 0 size so we get 24 lines
+        ;; setup
+        ld a,0
+        ld (DF_SZ),a                    ;set lower part of screen to 0 size so we get 24 lines
 
-		ld a,$2					;set printing to
-		call $1601				;top part of screen
+        ld a,$2                         ;set printing to
+        call $1601                      ;top part of screen
 
-		;; draw background
-		ld a,AT_CONTROL			;set print position:
-		rst $10 				;at
-		ld a,$0
-		rst $10					;0,
-		rst $10					;0
-		ld de, 704d				;22d*34d = characters in background
+        ;; draw background
+        ld a,AT_CONTROL                 ;set print position:
+        rst $10                         ;at
+        ld a,$0
+        rst $10                         ;0,
+        rst $10                         ;0
+        ld de, 704d                     ;22d*34d = characters in background
 DRAW_BACKGROUND_CHAR
-		ld a,'.'
-		rst $10
-		dec de
-		ld a,d
-		or e
-		jp nz,DRAW_BACKGROUND_CHAR
+        ld a,'.'
+        rst $10
+        dec de
+        ld a,d
+        or e
+        jp nz,DRAW_BACKGROUND_CHAR
 
-		;; save background
-		call DUMP_DISPLAYFILE
+        ;; save background
+        call DUMP_DISPLAYFILE
 
-		;; initialise sprite coords
-		ld a,$50
-		ld (OLDX),a				;initial X
-		ld (OLDY),a				;initial Y
-		ld (XPOS),a				;initial X
-		ld (YPOS),a				;initial Y
+        ;; initialise sprite coords
+        ld a,$50
+        ld (OLDX),a                     ;initial X
+        ld (OLDY),a                     ;initial Y
+        ld (XPOS),a                     ;initial X
+        ld (YPOS),a                     ;initial Y
 
-		ret 					;return from INIT
+        ret                             ;return from INIT
 
 DUMP_DISPLAYFILE
-		ld hl,$4000
-		ld de,$d800
-		ld bc,$1b00
-		ldir
-		ret
+        ld hl,$4000
+        ld de,$d800
+        ld bc,$1b00
+        ldir
+        ret
 
 RESTORE_DISPLAYFILE
-		ld hl,$d800
-		ld de,$4000
-		ld bc,$1b00
-		ldir
-		ret
+        ld hl,$d800
+        ld de,$4000
+        ld bc,$1b00
+        ldir
+        ret
 
 REARRANGE_UDGS
-		ld hl,PRINTER_BUFFER	;scratch area for rotated chars
-		push hl
-		xor a
-		ld b,a					;B:=0 becomes 255 when decremented
-CLEAR_PRN_BUF					;so visits all 265 bytes in printer buffer
-		ld (hl),a				;set to 0
-		inc hl
-		djnz CLEAR_PRN_BUF
-		pop de					;de:=printer_buffer
-		ld hl,UDG_LOCAL_DATA	;our UDG area
-		ld b,$04				;2 groups of chars + 2 groups of matte
+        ld hl,PRINTER_BUFFER            ;scratch area for rotated chars
+        push hl
+        xor a
+        ld b,a                          ;B:=0 becomes 255 when decremented
+CLEAR_PRN_BUF                           ;so visits all 265 bytes in printer buffer
+        ld (hl),a                       ;set to 0
+        inc hl
+        djnz CLEAR_PRN_BUF
+        pop de                          ;de:=printer_buffer
+        ld hl,UDG_LOCAL_DATA            ;our UDG area
+        ld b,$04                        ;2 groups of chars + 2 groups of matte
 GROUP_LOOP
-		push bc
-    	ld c,$08               	;8 bytes per char
+        push bc
+        ld c,$08                        ;8 bytes per char
 CONSECUTIVE_CHARS
-		ld b,$02				;2 consecutive chars in our sprite
-		push hl
+        ld b,$02                        ;2 consecutive chars in our sprite
+        push hl
 BYTES_LOOP
-		ld a,(hl)
-		ld (de),a
-		push bc
-		ld bc,$0008
-		add hl,bc
-		pop bc
-		inc de
-		djnz BYTES_LOOP
-		inc de
-		pop hl
-		inc hl					;select next char
-		dec c
-		jr nz, CONSECUTIVE_CHARS
-		ld c,$10				;b is already 0
-		add hl,bc				;select next group
-		pop bc
-		djnz GROUP_LOOP
-		ret
+        ld a,(hl)
+        ld (de),a
+        push bc
+        ld bc,$0008
+        add hl,bc
+        pop bc
+        inc de
+        djnz BYTES_LOOP
+        inc de
+        pop hl
+        inc hl                          ;select next char
+        dec c
+        jr nz, CONSECUTIVE_CHARS
+        ld c,$10                        ;b is already 0
+        add hl,bc                       ;select next group
+        pop bc
+        djnz GROUP_LOOP
+        ret
 
 ROTATE_SPRITE_TO_RIGHT
-		;; setup sprite X,Y
-		ld a,(YPOS)            	;
-		ld b,a					;
-		ld a,(XPOS)            	;
-		ld c,a					;bc := ypos,xpos
-		push bc
-		ld de,PRINTER_BUFFER
-		call $22aa				;PIXEL_ADD
-		ld c,a					;c:=number of rotates
-		and a					;check for zero
-		jr z,SKIP_ROTATE		;no rotate needed
+        ;; setup sprite X,Y
+        ld a,(YPOS)                     ;
+        ld b,a                          ;
+        ld a,(XPOS)                     ;
+        ld c,a                          ;bc := ypos,xpos
+        push bc
+        ld de,PRINTER_BUFFER
+        call $22aa                      ;PIXEL_ADD
+        ld c,a                          ;c:=number of rotates
+        and a                           ;check for zero
+        jr z,SKIP_ROTATE                ;no rotate needed
 ROTATE_NEXT_SPRITE_CHAR
-		push de
-		;ld b,$60				;3x3d sprite but 4d bytes wide = 12d * 8d = 92d = $60
-		ld b,$60				;2x2d sprite but 3d bytes wide = 6d * 8d = 48d = $30
-								;x2 for matte = $60
+        push de
+        ;ld b,$60                       ;3x3d sprite but 4d bytes wide = 12d * 8d = 92d = $60
+        ld b,$60                        ;2x2d sprite but 3d bytes wide = 6d * 8d = 48d = $30
+                                        ;x2 for matte = $60
 ROTATE_ONE_CHAR_C_TIMES
-		ld a,(de)
-		rra
-		ld (de),a
-		inc de
-		djnz ROTATE_ONE_CHAR_C_TIMES
-		pop de
-		dec c					;need to rotate again?
-		jr nz,ROTATE_NEXT_SPRITE_CHAR
+        ld a,(de)
+        rra
+        ld (de),a
+        inc de
+        djnz ROTATE_ONE_CHAR_C_TIMES
+        pop de
+        dec c                           ;need to rotate again?
+        jr nz,ROTATE_NEXT_SPRITE_CHAR
 SKIP_ROTATE
-		pop bc
-		ret
+        pop bc
+        ret
 
 DISPLAY_SPRITE
-		ld de,$9800				;offset for displayfile copy
-		ld ix,PRINTER_BUFFER
-		exx
-		ld b,$10				;$18=24d = 3x8 pixel lines
+        ld de,$9800                     ;offset for displayfile copy
+        ld ix,PRINTER_BUFFER
+        exx
+        ld b,$10                        ;$18=24d = 3x8 pixel lines
 EACH_BYTE_IN_CHAR_Y
-		exx
-		push bc
-		call $22aa				;PIXEL_ADD
-		ld b,$03				;sprite width=3
+        exx
+        push bc
+        call $22aa                      ;PIXEL_ADD
+        ld b,$03                        ;sprite width=3
 EACH_CHAR_IN_SPRITE
-		push hl
-		add hl,de
-		ld a,(ix+48d)
-		cpl
-		and (hl)
-		ld c,a
-		ld a,(ix+48d)
-		and (ix+0)
-		or c
-		pop hl
-		ld (hl),a
-		inc hl
-		inc ix
-		djnz EACH_CHAR_IN_SPRITE
-		pop bc
-		dec b
-		exx
-		djnz EACH_BYTE_IN_CHAR_Y
-		exx
-		ret
+        push hl
+        add hl,de
+        ld a,(ix+48d)
+        cpl
+        and (hl)
+        ld c,a
+        ld a,(ix+48d)
+        and (ix+0)
+        or c
+        pop hl
+        ld (hl),a
+        inc hl
+        inc ix
+        djnz EACH_CHAR_IN_SPRITE
+        pop bc
+        dec b
+        exx
+        djnz EACH_BYTE_IN_CHAR_Y
+        exx
+        ret
 
 ;; replace sprite bytes with
 ;; background bytes
 UNDISPLAY_SPRITE
-		ld a,(OLDY)            	;
-		ld b,a					;
-		ld a,(OLDX)            	;
-		ld c,a					;bc := ypos,xpos
-		ld de,$9800				;offset for displayfile copy
-		exx
-		ld b,$10				;$10=16d = 2x8 pixel lines
+        ld a,(OLDY)                     ;
+        ld b,a                          ;
+        ld a,(OLDX)                     ;
+        ld c,a                          ;bc := ypos,xpos
+        ld de,$9800                     ;offset for displayfile copy
+        exx
+        ld b,$10                        ;$10=16d = 2x8 pixel lines
 EACH_BYTE_IN_CHAR_Y_UN
-		exx
-		push bc
-		call $22aa				;pixel_add
-		ld b,$03				;sprite width=3
+        exx
+        push bc
+        call $22aa                      ;pixel_add
+        ld b,$03                        ;sprite width=3
 EACH_CHAR_IN_SPRITE_UN
-		push hl
-		add hl,de
-		ld a,(hl)
-		pop hl
-		ld (hl),a
-		inc hl
-		djnz EACH_CHAR_IN_SPRITE_UN
-		pop bc
-		dec b
-		exx
-		djnz EACH_BYTE_IN_CHAR_Y_UN
-		exx
-		ret
+        push hl
+        add hl,de
+        ld a,(hl)
+        pop hl
+        ld (hl),a
+        inc hl
+        djnz EACH_CHAR_IN_SPRITE_UN
+        pop bc
+        dec b
+        exx
+        djnz EACH_BYTE_IN_CHAR_Y_UN
+        exx
+        ret
 
 PRINT_SPRITE
-		call REARRANGE_UDGS
-		call ROTATE_SPRITE_TO_RIGHT
-		push bc
-		call ERASE_OLD_SPRITE
-		pop bc
-		call DISPLAY_SPRITE
-		ret
+        call REARRANGE_UDGS
+        call ROTATE_SPRITE_TO_RIGHT
+        push bc
+        call ERASE_OLD_SPRITE
+        pop bc
+        call DISPLAY_SPRITE
+        ret
 
 ERASE_OLD_SPRITE
-		call UNDISPLAY_SPRITE
-		;call RESTORE_DISPLAYFILE
-		ret
+        call UNDISPLAY_SPRITE
+        ;call RESTORE_DISPLAYFILE
+        ret
 
-XPOS	defb 0
-YPOS	defb 0
-OLDX	defb 0
-OLDY	defb 0
+XPOS    defb 0
+YPOS    defb 0
+OLDX    defb 0
+OLDY    defb 0
 
 ;; UDG characters
 
 UDG_LOCAL_DATA
 TOP_LEFT
-	defb 7, 31, 63, 127, 127, 255, 255, 255			;A
+    defb 7, 31, 63, 127, 127, 255, 255, 255       ;A
 TOP_RIGHT
-	defb 224, 248, 252, 254, 254, 255, 255, 255		;B
-	defb 0,0,0,0,0,0,0,0							;C
+    defb 224, 248, 252, 254, 254, 255, 255, 255   ;B
+    defb 0,0,0,0,0,0,0,0                          ;C
 BOTTOM_RIGHT
-	defb 255, 255, 243, 115, 127, 63, 31, 7			;D
+    defb 255, 255, 243, 115, 127, 63, 31, 7       ;D
 BOTTOM_LEFT
-	defb 255, 255, 255, 254, 254, 252, 248, 224		;E
-	defb 0,0,0,0,0,0,0,0							;F
+    defb 255, 255, 255, 254, 254, 252, 248, 224   ;E
+    defb 0,0,0,0,0,0,0,0                          ;F
 TOP_LEFT_MATTE
-	defb 7, 31, 63, 127, 127, 255, 255, 255			;G
+    defb 7, 31, 63, 127, 127, 255, 255, 255       ;G
 TOP_RIGHT_MATTE
-	defb 224, 248, 252, 254, 254, 255, 255, 255		;H
-	defb 0,0,0,0,0,0,0,0							;I
+    defb 224, 248, 252, 254, 254, 255, 255, 255   ;H
+    defb 0,0,0,0,0,0,0,0                          ;I
 BOTTOM_RIGHT_MATTE
-	defb 255, 255, 243, 115, 127, 63, 31, 7			;J
+    defb 255, 255, 243, 115, 127, 63, 31, 7       ;J
 BOTTOM_LEFT_MATTE
-	defb 255, 255, 255, 254, 254, 252, 248, 224		;K
-	defb 0,0,0,0,0,0,0,0							;L
+    defb 255, 255, 255, 254, 254, 252, 248, 224   ;K
+    defb 0,0,0,0,0,0,0,0                          ;L
 
 ;; definitions
 
-PIXELS_START	EQU	$4000		; ZXSP SCREEN PIXELS
-ATTR_START		EQU	$5800		; ZXSP SCREEN ATTRIBUTES
-PRINTER_BUFFER	EQU	$5B00		; ZXSP PRINTER BUFFER
-CODE_START		EQU	24000
+PIXELS_START    EQU $4000               ; ZXSP SCREEN PIXELS
+ATTR_START      EQU $5800               ; ZXSP SCREEN ATTRIBUTES
+PRINTER_BUFFER  EQU $5B00               ; ZXSP PRINTER BUFFER
+CODE_START      EQU 24000
 
 ; colours
-COLOUR_BLACK 	equ $0
-COLOUR_WHITE 	equ $07
+COLOUR_BLACK    equ $0
+COLOUR_WHITE    equ $07
 
 ; characters
-ENTER     		equ $0d
-INK_CONTROL 	equ $10
-PAPER_CONTROL 	equ $11
-AT_CONTROL		equ $16
-SPACE			equ $20
-ASTERISK  		equ $2A
-PLUS      		equ $2b
-ZERO      		equ $30
-NINE 			equ $39
-GRAPHIC_A		equ $90
-GRAPHIC_B		equ $91
-GRAPHIC_C		equ $92
-GRAPHIC_D		equ $93
-GRAPHIC_SHIFT_3	equ $8C
+ENTER           equ $0d
+INK_CONTROL     equ $10
+PAPER_CONTROL   equ $11
+AT_CONTROL      equ $16
+SPACE           equ $20
+ASTERISK        equ $2A
+PLUS            equ $2b
+ZERO            equ $30
+NINE            equ $39
+GRAPHIC_A       equ $90
+GRAPHIC_B       equ $91
+GRAPHIC_C       equ $92
+GRAPHIC_D       equ $93
+GRAPHIC_SHIFT_3 equ $8C
 
 ; system vars
-TVFLAG   	equ $5c3c
-DF_SZ 		equ $5C6B
-UDGS 		equ $5C7B
-DF_CC    	equ $5c84
-S_POSN   	equ $5c88
-ATTR_T   	equ $5C8F
-MEMBOT   	equ $5C92
+TVFLAG          equ $5c3c
+DF_SZ           equ $5C6B
+UDGS            equ $5C7B
+DF_CC           equ $5c84
+S_POSN          equ $5c88
+ATTR_T          equ $5C8F
+MEMBOT          equ $5C92
 
 ; rom routines
-KEY_SCAN	equ $028e
-KEY_TEST	equ $031e
-KEY_CODE	equ $0333
+KEY_SCAN        equ $028e
+KEY_TEST        equ $031e
+KEY_CODE        equ $0333
 
 
 ;; $028e.  5  KEY_SCAN   {001} the keyboard scanning subroutine
