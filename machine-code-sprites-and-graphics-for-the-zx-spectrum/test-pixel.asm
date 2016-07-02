@@ -1,10 +1,12 @@
-; ====================================================================
+; =======================================================================
 ;	pixel sprite code largely taken from
-;	machine code sprites and graphics for the zx spectrum by john durst
+;	'machine code sprites and graphics for the zx spectrum' by john durst
 ;
-;   assemble using zasm 4:
+;   assemble using zasm 4 to create a .tap file:
 ;     zasm -u test-pixel.asm
-; ====================================================================
+;
+;   for other assemblers remove all lines up until 113
+; =======================================================================
 
 ; fill byte is 0x00
 ; #code has an additional argument: the sync byte for the block.
@@ -18,7 +20,6 @@
 HEADERFLAG:     equ 0
 DATAFLAG:       equ $ff
 
-
 ; some Basic tokens:
 tCLEAR		equ     $FD             ; token CLEAR
 tLOAD		equ     $EF             ; token LOAD
@@ -27,45 +28,6 @@ tPRINT		equ     $F5             ; token PRINT
 tRANDOMIZE	equ     $F9             ; token RANDOMIZE
 tUSR		equ     $C0             ; token USR
 tCLS 		equ		$FB				; token CLS
-
-PIXELS_START	EQU	$4000		; ZXSP SCREEN PIXELS
-ATTR_START		EQU	$5800		; ZXSP SCREEN ATTRIBUTES
-PRINTER_BUFFER	EQU	$5B00		; ZXSP PRINTER BUFFER
-CODE_START		EQU	24000
-
-; colours
-COLOUR_BLACK 	equ $0
-COLOUR_WHITE 	equ $07
-
-; characters
-ENTER     		equ $0d
-INK_CONTROL 	equ $10
-PAPER_CONTROL 	equ $11
-AT_CONTROL		equ $16
-SPACE			equ $20
-ASTERISK  		equ $2A
-PLUS      		equ $2b
-ZERO      		equ $30
-NINE 			equ $39
-GRAPHIC_A		equ $90
-GRAPHIC_B		equ $91
-GRAPHIC_C		equ $92
-GRAPHIC_D		equ $93
-GRAPHIC_SHIFT_3	equ $8C
-
-; system vars
-TVFLAG   	equ $5c3c
-DF_SZ 		equ $5C6B
-UDGS 		equ $5C7B
-DF_CC    	equ $5c84
-S_POSN   	equ $5c88
-ATTR_T   	equ $5C8F
-MEMBOT   	equ $5C92
-
-; rom routines
-KEY_SCAN	equ $028e
-KEY_TEST	equ $031e
-KEY_CODE	equ $0333
 
 ; ---------------------------------------------------
 ;		ram-based, non-initialized variables
@@ -76,8 +38,6 @@ KEY_CODE	equ $0333
 #data VARIABLES, PRINTER_BUFFER, 0x100
 
 ; define some variables here
-
-
 
 ; ---------------------------------------------------
 ;		a Basic Loader:
@@ -132,8 +92,6 @@ PROGRAM_END:
 
 VARIABLES_END:
 
-
-
 ; ---------------------------------------------------
 ;		a machine code block:
 ; ---------------------------------------------------
@@ -149,7 +107,81 @@ VARIABLES_END:
 
 ; Z80 assembler code and data
 
-	;; setup
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; end of zasm .tap template
+;;
+;; for other assemblers just copy from here
+;; and use an org directive eg:
+;;
+;; org 24000
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+		call INIT_SCREEN
+		call PRINT_SPRITE
+GAME_LOOP
+		call KEY_SCAN
+		inc d
+		jr nz,CYCLE 			;Don't move if more than one key pressed.
+		ld a,e 					;a: = key code of key pressed (ff if none).
+		cp $1a					;check for o key
+		jr z,HANDLE_LEFT
+		cp $22					;check for p key
+		jr z,HANDLE_RIGHT
+		cp $25					;check for q key
+		jr z,HANDLE_UP
+		cp $26 					;check for a key
+		jr z,HANDLE_DOWN
+		cp $27					;check for capshift (left shift on mac) key
+		jr nz,CYCLE				;no match? loop again. otherwise fall through
+HANDLE_QUIT
+		ld a,$2
+		ld (DF_SZ),a 			;restore lower part of screen to 2
+		ret						;return to BASIC
+HANDLE_DOWN
+		ld a,(YPOS)
+		cp $28					;is y at bottom? 32d (we're 2 tall)
+		jr z,CYCLE				;yes. can't move down any further
+		ld (OLDY),a
+		sub a,$1
+		ld (YPOS),a
+		jr MOVE_SPRITE_1
+HANDLE_LEFT
+		ld a,(XPOS)
+		cp $0					;is x at left?
+		jr z,CYCLE				;yes. can't move left any further
+		ld (OLDX),a
+		sub a,$1
+		ld (XPOS),a
+		jr MOVE_SPRITE_1
+HANDLE_RIGHT
+		ld a,(XPOS)
+		cp $e7					;is x at right? 30d
+		jr z,CYCLE 				;yes. can't move right any further
+		ld (OLDX),a
+		add a,$1
+		ld (XPOS),a
+		jr MOVE_SPRITE_1
+HANDLE_UP
+		ld a,(YPOS)
+		cp $10					;is y at top?
+		jr z,CYCLE				;yes. can't move up any further
+		ld (OLDY),a
+		add a,$1
+		ld (YPOS),a
+MOVE_SPRITE_1
+		;halt
+		call PRINT_SPRITE
+CYCLE
+		jr GAME_LOOP
+
+		;;
+		;; subroutines
+		;;
+
+INIT_SCREEN
+		;; setup
 		ld a,0
 		ld (DF_SZ),a 			;set lower part of screen to 0 size so we get 24 lines
 
@@ -174,78 +206,14 @@ DRAW_BACKGROUND_CHAR
 		;; save background
 		call DUMP_DISPLAYFILE
 
-		;; display sprite
-		ld a,$20
+		;; initialise sprite coords
+		ld a,$50
+		ld (OLDX),a				;initial X
+		ld (OLDY),a				;initial Y
 		ld (XPOS),a				;initial X
 		ld (YPOS),a				;initial Y
-		call PRINT_SPRITE
-LOOP
-		call KEY_SCAN
-		inc d
-		jr nz,CYCLE 			;Don't move if more than one key pressed.
-		ld a,e 					;a: = key code of key pressed (ff if none).
-		cp $1a					;check for o key
-		jr z,LEFT
-		cp $22					;check for p key
-		jr z,RIGHT
-		cp $25					;check for q key
-		jr z,UP
-		cp $26 					;check for a key
-		jr z,DOWN
-		cp $27					;check for capshift (left shift on mac) key
-		jr nz,CYCLE				;no match? loop again. otherwise fall through
-QUIT
-		ld a,$2
-		ld (DF_SZ),a 			;restore lower part of screen to 2
-		ret						;return to BASIC
-DOWN
-		ld a,(YPOS)
-		cp $28					;is y at bottom? 32d (we're 2 tall)
-		jr z,CYCLE				;yes. can't move down any further
-		push af
-		call ERASE_SPRITE
-		pop af
-		sub $3
-		ld (YPOS),a
-		jr MOVE_SPRITE_1
-LEFT
-		ld a,(XPOS)
-		cp $0					;is x at left?
-		jr z,CYCLE				;yes. can't move left any further
-		push af
-		call ERASE_SPRITE
-		pop af
-		sub $3
-		ld (XPOS),a
-		jr MOVE_SPRITE_1
-RIGHT
-		ld a,(XPOS)
-		cp $e7					;is x at right? 30d
-		jr z,CYCLE 				;yes. can't move right any further
-		push af
-		call ERASE_SPRITE
-		pop af
-		add $3
-		ld (XPOS),a
-		jr MOVE_SPRITE_1
-UP
-		ld a,(YPOS)
-		cp $10					;is y at top?
-		jr z,CYCLE				;yes. can't move up any further
-		push af
-		call ERASE_SPRITE
-		pop af
-		add $3
-		ld (YPOS),a
-MOVE_SPRITE_1
-		call PRINT_SPRITE
-CYCLE
-		jr LOOP
-		ret
 
-	;;
-	;; subroutines
-	;;
+		ret 					;return from INIT
 
 DUMP_DISPLAYFILE
 		ld hl,$4000
@@ -272,7 +240,6 @@ CLEAR_PRN_BUF					;so visits all 265 bytes in printer buffer
 		djnz CLEAR_PRN_BUF
 		pop de					;de:=printer_buffer
 		ld hl,UDG_LOCAL_DATA	;our UDG area
-		; ld hl,(UDGS)			;our UDG area
 		ld b,$04				;2 groups of chars + 2 groups of matte
 GROUP_LOOP
 		push bc
@@ -308,7 +275,7 @@ ROTATE_SPRITE_TO_RIGHT
 		ld c,a					;bc := ypos,xpos
 		push bc
 		ld de,PRINTER_BUFFER
-		call $22aa
+		call $22aa				;PIXEL_ADD
 		ld c,a					;c:=number of rotates
 		and a					;check for zero
 		jr z,SKIP_ROTATE		;no rotate needed
@@ -317,15 +284,15 @@ ROTATE_NEXT_SPRITE_CHAR
 		;ld b,$60				;3x3d sprite but 4d bytes wide = 12d * 8d = 92d = $60
 		ld b,$60				;2x2d sprite but 3d bytes wide = 6d * 8d = 48d = $30
 								;x2 for matte = $60
-ROTATE_ONE_CHAR_N_TIMES
+ROTATE_ONE_CHAR_C_TIMES
 		ld a,(de)
 		rra
 		ld (de),a
 		inc de
-		djnz ROTATE_ONE_CHAR_N_TIMES
+		djnz ROTATE_ONE_CHAR_C_TIMES
 		pop de
 		dec c					;need to rotate again?
-		jr nz, ROTATE_NEXT_SPRITE_CHAR
+		jr nz,ROTATE_NEXT_SPRITE_CHAR
 SKIP_ROTATE
 		pop bc
 		ret
@@ -338,7 +305,7 @@ DISPLAY_SPRITE
 EACH_BYTE_IN_CHAR_Y
 		exx
 		push bc
-		call $22aa				;pixel_add
+		call $22aa				;PIXEL_ADD
 		ld b,$03				;sprite width=3
 EACH_CHAR_IN_SPRITE
 		push hl
@@ -348,7 +315,7 @@ EACH_CHAR_IN_SPRITE
 		and (hl)
 		ld c,a
 		ld a,(ix+48d)
-		and (ix)
+		and (ix+0)
 		or c
 		pop hl
 		ld (hl),a
@@ -362,21 +329,120 @@ EACH_CHAR_IN_SPRITE
 		exx
 		ret
 
+;; replace sprite bytes with
+;; background bytes
+UNDISPLAY_SPRITE
+		ld a,(OLDY)            	;
+		ld b,a					;
+		ld a,(OLDX)            	;
+		ld c,a					;bc := ypos,xpos
+		ld de,$9800				;offset for displayfile copy
+		exx
+		ld b,$10				;$10=16d = 2x8 pixel lines
+EACH_BYTE_IN_CHAR_Y_UN
+		exx
+		push bc
+		call $22aa				;pixel_add
+		ld b,$03				;sprite width=3
+EACH_CHAR_IN_SPRITE_UN
+		push hl
+		add hl,de
+		ld a,(hl)
+		pop hl
+		ld (hl),a
+		inc hl
+		djnz EACH_CHAR_IN_SPRITE_UN
+		pop bc
+		dec b
+		exx
+		djnz EACH_BYTE_IN_CHAR_Y_UN
+		exx
+		ret
+
 PRINT_SPRITE
 		call REARRANGE_UDGS
 		call ROTATE_SPRITE_TO_RIGHT
+		push bc
+		call ERASE_OLD_SPRITE
+		pop bc
 		call DISPLAY_SPRITE
 		ret
 
-ERASE_SPRITE
-		call RESTORE_DISPLAYFILE
+ERASE_OLD_SPRITE
+		call UNDISPLAY_SPRITE
+		;call RESTORE_DISPLAYFILE
 		ret
 
 XPOS	defb 0
 YPOS	defb 0
+OLDX	defb 0
+OLDY	defb 0
 
+;; UDG characters
 
-#include "udgs.asm"
+UDG_LOCAL_DATA
+TOP_LEFT
+	defb 7, 31, 63, 127, 127, 255, 255, 255			;A
+TOP_RIGHT
+	defb 224, 248, 252, 254, 254, 255, 255, 255		;B
+	defb 0,0,0,0,0,0,0,0							;C
+BOTTOM_RIGHT
+	defb 255, 255, 243, 115, 127, 63, 31, 7			;D
+BOTTOM_LEFT
+	defb 255, 255, 255, 254, 254, 252, 248, 224		;E
+	defb 0,0,0,0,0,0,0,0							;F
+TOP_LEFT_MATTE
+	defb 7, 31, 63, 127, 127, 255, 255, 255			;G
+TOP_RIGHT_MATTE
+	defb 224, 248, 252, 254, 254, 255, 255, 255		;H
+	defb 0,0,0,0,0,0,0,0							;I
+BOTTOM_RIGHT_MATTE
+	defb 255, 255, 243, 115, 127, 63, 31, 7			;J
+BOTTOM_LEFT_MATTE
+	defb 255, 255, 255, 254, 254, 252, 248, 224		;K
+	defb 0,0,0,0,0,0,0,0							;L
+
+;; definitions
+
+PIXELS_START	EQU	$4000		; ZXSP SCREEN PIXELS
+ATTR_START		EQU	$5800		; ZXSP SCREEN ATTRIBUTES
+PRINTER_BUFFER	EQU	$5B00		; ZXSP PRINTER BUFFER
+CODE_START		EQU	24000
+
+; colours
+COLOUR_BLACK 	equ $0
+COLOUR_WHITE 	equ $07
+
+; characters
+ENTER     		equ $0d
+INK_CONTROL 	equ $10
+PAPER_CONTROL 	equ $11
+AT_CONTROL		equ $16
+SPACE			equ $20
+ASTERISK  		equ $2A
+PLUS      		equ $2b
+ZERO      		equ $30
+NINE 			equ $39
+GRAPHIC_A		equ $90
+GRAPHIC_B		equ $91
+GRAPHIC_C		equ $92
+GRAPHIC_D		equ $93
+GRAPHIC_SHIFT_3	equ $8C
+
+; system vars
+TVFLAG   	equ $5c3c
+DF_SZ 		equ $5C6B
+UDGS 		equ $5C7B
+DF_CC    	equ $5c84
+S_POSN   	equ $5c88
+ATTR_T   	equ $5C8F
+MEMBOT   	equ $5C92
+
+; rom routines
+KEY_SCAN	equ $028e
+KEY_TEST	equ $031e
+KEY_CODE	equ $0333
+
 
 ;; $028e.  5  KEY_SCAN   {001} the keyboard scanning subroutine
 ;; On returning from $028e KEY_SCAN the DE register and the Zero flag indicate
