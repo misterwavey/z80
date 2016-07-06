@@ -5,7 +5,7 @@
 ;  assemble using zasm 4 to create a .tap file:
 ;    zasm -u test-pixel.asm
 ;
-;  for other assemblers remove all lines from 1 to up until around 113
+;  for other assemblers remove lines from 1 to up until around 110
 ; =======================================================================
 
 ; fill byte is 0x00
@@ -109,14 +109,19 @@ VARIABLES_END:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; end of zasm .tap template
+;; end of zasm .tap template header
 ;;
-;; for other assemblers just copy from here
+;; for other assemblers just copy from here onwards
 ;; and use an org directive eg:
 ;;
 ;; org 24000
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; move a 2x2 sprite against a background
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
         call INIT_SCREEN
         call PRINT_SPRITE
@@ -212,11 +217,10 @@ DRAW_BACKGROUND_CHAR
         ld (OLDY),a                     ;initial Y
         ld (XPOS),a                     ;initial X
         ld (YPOS),a                     ;initial Y
-
         ret                             ;return from INIT
 
 DUMP_DISPLAYFILE
-        ld hl,$4000
+        ld hl,PIXELS_START
         ld de,$d800
         ld bc,$1b00
         ldir
@@ -224,11 +228,15 @@ DUMP_DISPLAYFILE
 
 RESTORE_DISPLAYFILE
         ld hl,$d800
-        ld de,$4000
+        ld de,PIXELS_START
         ld bc,$1b00
         ldir
         ret
 
+;; interleave bytes of UDG characters for linear access
+;; A0 A1 A2 A3 A4 A5 A6 A7 B0 B1 B2 B3 B4 B5 B6 B7 C0 C1 C2 C3 C4 C5 C6 C7
+;; becomes
+;; A0 B0 C0 A1 B1 C1 A2 B2 C2 A3 B3 C3 A4 B4 C4 ...
 REARRANGE_UDGS
         ld hl,PRINTER_BUFFER            ;scratch area for rotated chars
         push hl
@@ -260,7 +268,7 @@ BYTES_LOOP
         pop hl
         inc hl                          ;select next char
         dec c
-        jr nz, CONSECUTIVE_CHARS
+        jr nz,CONSECUTIVE_CHARS
         ld c,$10                        ;b is already 0
         add hl,bc                       ;select next group
         pop bc
@@ -301,23 +309,24 @@ DISPLAY_SPRITE
         ld de,$9800                     ;offset for displayfile copy
         ld ix,PRINTER_BUFFER
         exx
-        ld b,$10                        ;$18=24d = 3x8 pixel lines
+        ;ld b,$18                       ;$18=24d = 3x8 pixel lines
+        ld b,$10                        ;$10=16d = 2x8 pixel lines
 EACH_BYTE_IN_CHAR_Y
         exx
         push bc
         call $22aa                      ;PIXEL_ADD
-        ld b,$03                        ;sprite width=3
+        ld b,$03                        ;sprite width=3 (with space)
 EACH_CHAR_IN_SPRITE
         push hl
-        add hl,de
-        ld a,(ix+48d)
-        cpl
-        and (hl)
+        add hl,de                       ;displayfile copy address
+        ld a,(ix+48d)                   ;matte to UDG 'A'
+        cpl                             ;make negative matte
+        and (hl)                        ;mask background
         ld c,a
-        ld a,(ix+48d)
-        and (ix+0)
-        or c
-        pop hl
+        ld a,(ix+48d)                   ;matte to 'A'
+        and (ix+0)                      ;mask sprite
+        or c                            ;make composite
+        pop hl                          ;original displayfile address
         ld (hl),a
         inc hl
         inc ix
@@ -379,28 +388,26 @@ OLDX    defb 0
 OLDY    defb 0
 
 ;; UDG characters
-
 UDG_LOCAL_DATA
-TOP_LEFT
-    defb 7, 31, 63, 127, 127, 255, 255, 255       ;A
-TOP_RIGHT
-    defb 224, 248, 252, 254, 254, 255, 255, 255   ;B
-    defb 0,0,0,0,0,0,0,0                          ;C
-BOTTOM_RIGHT
-    defb 255, 255, 243, 115, 127, 63, 31, 7       ;D
-BOTTOM_LEFT
-    defb 255, 255, 255, 254, 254, 252, 248, 224   ;E
-    defb 0,0,0,0,0,0,0,0                          ;F
-TOP_LEFT_MATTE
-    defb 7, 31, 63, 127, 127, 255, 255, 255       ;G
-TOP_RIGHT_MATTE
-    defb 224, 248, 252, 254, 254, 255, 255, 255   ;H
-    defb 0,0,0,0,0,0,0,0                          ;I
-BOTTOM_RIGHT_MATTE
-    defb 255, 255, 243, 115, 127, 63, 31, 7       ;J
-BOTTOM_LEFT_MATTE
-    defb 255, 255, 255, 254, 254, 252, 248, 224   ;K
-    defb 0,0,0,0,0,0,0,0                          ;L
+;; main sprite
+;; 2x top row sprite characters + 1x rotate space
+    defb 7, 31, 63, 127, 127, 255, 255, 255       ;A TOP_LEFT
+    defb 224, 248, 252, 254, 254, 255, 255, 255   ;B TOP_RIGHT
+    defb 0,0,0,0,0,0,0,0                          ;C rotate space
+
+;; 2x bottom row sprite characters + 1x rotate space
+    defb 255, 255, 243, 115, 127, 63, 31, 7       ;D BOTTOM_RIGHT
+    defb 255, 255, 255, 254, 254, 252, 248, 224   ;E BOTTOM_LEFT
+    defb 0,0,0,0,0,0,0,0                          ;F rotate space
+
+;; matte sprite (identical to main sprite)
+    defb 7, 31, 63, 127, 127, 255, 255, 255       ;G TOP_LEFT_MATTE
+    defb 224, 248, 252, 254, 254, 255, 255, 255   ;H TOP_RIGHT_MATTE
+    defb 0,0,0,0,0,0,0,0                          ;I space
+
+    defb 255, 255, 243, 115, 127, 63, 31, 7       ;J BOTTOM_RIGHT_MATTE
+    defb 255, 255, 255, 254, 254, 252, 248, 224   ;K BOTTOM_LEFT_MATTE
+    defb 0,0,0,0,0,0,0,0                          ;L space
 
 ;; definitions
 
