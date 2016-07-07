@@ -1,11 +1,15 @@
 ; =======================================================================
 ;  pixel sprite code largely taken from
-;  'machine code sprites and graphics for the zx spectrum' by john durst
+;  'how to write spectrum games' by jonathan caldwell
 ;
 ;  assemble using zasm 4 to create a .tap file:
-;    zasm -u test-pixel.asm
+;    zasm -u cauldwell-pixel.asm
+;  load tap into emulator and it will run automatically
 ;
-;  for other assemblers remove lines from 1 to up until around 110
+;  for other assemblers remove lines from 1 to up until around 110 and eg
+;    pasmo --tapbas cauldwell-pixel.asm cauldwell-pixel.tap
+;  load tap into emulator and from BASIC enter:
+;    RANDOMIZE USR 24000
 ; =======================================================================
 
 ; fill byte is 0x00
@@ -141,9 +145,9 @@ GAME_LOOP
         jr nz,CYCLE                     ; Don't move if more than one key pressed.
         ld a,e                          ; a: = key code of key pressed (ff if none).
         cp $1a                          ; check for o key
-        jr z,HANDLE_LEFT
-        cp $22                          ; check for p key
         jr z,HANDLE_RIGHT
+        cp $22                          ; check for p key
+        jr z,HANDLE_LEFT    
         ; cp $25                          ; check for q key
         ; jr z,HANDLE_UP
         ; cp $26                          ; check for a key
@@ -190,7 +194,7 @@ HANDLE_RIGHT
         cp d                            ; already MAX_POS position?
         jp nz,INC_POS                   ; no, decrease position
         ld a,0                          ; yes, wrap to list start pos
-        ld (POS),a                      ; store new value
+        ld (POS),a
         jr AFTER_INC_POS
 INC_POS
         inc a                           ; pos is < MAX so increment
@@ -288,12 +292,17 @@ SPRIT3
 
 SPRITE
         ld ix,CIRCLE_POS                ; ix points to list of xy positions for circle
-        ld de,(POS)                     ; setup index into list
+        ld de,(POS)                     ; lookup index into list
+        push hl                         ; protect hl
+        ld hl,de                        ; store a copy of the index counter
+        add hl,de                       ; double the value because we've got 2 co ord
+        ld de,hl                        ; swap registers
+        pop hl                          ; restore hl
         add ix,de                       ; add index to list address
         ld a,(ix)                       ; find x coordinate at that position in list
-        ld b,a
+        ld b,a                          ; b:= y coord
         ld a,(ix+1)                     ; find y coordinate at next position in list
-        ld c,a
+        ld c,a                          ; c:= x coord
         ld (DISPX),bc                   ; store coords in dispx for now.
         call SCADD                      ; calculate screen address.
         ld a,16                         ; height of sprite in pixels.
@@ -385,7 +394,7 @@ SCADD
         ld e,a                          ; hl = address of screen.
         ret
 
-MAX_POS defb 3                          ; 0, 1, 2, 3
+MAX_POS defb 15                        ; 0, 1, 2, 3
 POS     defb 0                          ; index into circle pos for sprite
 XPOS    defb 0
 YPOS    defb 0
@@ -405,7 +414,8 @@ UDG_LOCAL_DATA
 ;interleaved now: C0D0C1D1C2D2C3D3C4D4C5D5C6D6C7D7
     defb 255,255,255,255,243,255,115,254,127,254,63,252,31,248,7,224
 
-CIRCLE_POS  defb 120,24,40,96,124,64,200,92 ; x,y coords in a list
+CIRCLE_POS  defb 120,24,  84,28,   68,40,   48,60,   40,96,  52,128, 68,148, 88,160
+            defb 120,164, 152,160, 180,144, 196,120, 200,96, 192,60, 180,44, 160,32  ; x,y coords in a list
 
 PIXELS_START    EQU $4000               ; ZXSP SCREEN PIXELS
 ATTR_START      EQU $5800               ; ZXSP SCREEN ATTRIBUTES
