@@ -125,11 +125,13 @@ VARIABLES_END:
 
         call INIT_SCREEN
         ld hl,UDG_LOCAL_DATA            ; sprite address.
-        ld a,160
-        ld c,a                          ; set x coordinate.
-        ld a,$50
-        ld b,a                          ; set y coordinate.
-        ld (XPOS),bc                    ; set up sprite routine coords.
+        ; ld a,160
+        ; ld c,a                          ; set x coordinate.
+        ; ld a,$50
+        ; ld b,a                          ; set y coordinate.
+        ; ld (XPOS),bc                    ; set up sprite routine coords.
+        ld a,0                          ;initial position in circle list
+        ld (POS),a
         push hl
         call SPRITE
         pop hl
@@ -142,58 +144,92 @@ GAME_LOOP
         jr z,HANDLE_LEFT
         cp $22                          ; check for p key
         jr z,HANDLE_RIGHT
-        cp $25                          ; check for q key
-        jr z,HANDLE_UP
-        cp $26                          ; check for a key
-        jr z,HANDLE_DOWN
+        ; cp $25                          ; check for q key
+        ; jr z,HANDLE_UP
+        ; cp $26                          ; check for a key
+        ; jr z,HANDLE_DOWN
         cp $27                          ; check for capshift (left shift on mac) key
         jr nz,CYCLE                     ; no match? loop again. otherwise fall through
 HANDLE_QUIT
         ld a,$2
         ld (DF_SZ),a                    ; restore lower part of screen to 2
         ret                             ; return to BASIC
-HANDLE_DOWN
-        ld a,(YPOS)
-        cp 170                          ; is y at bottom? 32d (we're 2 tall)
-        jr z,CYCLE                      ; yes. can't move down any further
-        push af
-        call UNDISPLAY_SPRITE
-        pop af
-        add a,$1
-        ld (YPOS),a
-        jr DISPLAY_SPRITE
+; HANDLE_DOWN
+;         ld a,(YPOS)
+;         cp 170                          ; is y at bottom? 32d (we're 2 tall)
+;         jr z,CYCLE                      ; yes. can't move down any further
+;         push af
+;         call UNDISPLAY_SPRITE
+;         pop af
+;         add a,$2
+;         ld (YPOS),a
+;         jr DISPLAY_SPRITE
 HANDLE_LEFT
-        ld a,(XPOS)
-        cp $0                           ; is x at left?
-        jr z,CYCLE                      ; yes. can't move left any further
         push af
-        call UNDISPLAY_SPRITE
+        call UNDISPLAY_SPRITE           ; undisplay current position
         pop af
-        sub a,$1
-        ld (XPOS),a
+        ld a,(POS)                      ; find current position in list
+        cp 0                            ; already 0 position?
+        jp nz,DEC_POS                   ; no, decrease position
+        ld a,(MAX_POS)                  ; yes, wrap to max list pos
+        ld (POS),a                      ; store new value
+        jr AFTER_DEC_POS
+DEC_POS
+        dec a                           ; pos is > 0 so decrement
+        ld (POS),a                      ; store new value
+AFTER_DEC_POS
         jr DISPLAY_SPRITE
+
 HANDLE_RIGHT
-        ld a,(XPOS)
-        cp $e7                          ; is x at right? 30d
-        jr z,CYCLE                      ; yes. can't move right any further
         push af
-        call UNDISPLAY_SPRITE
+        call UNDISPLAY_SPRITE           ; undisplay current position
         pop af
-        add a,$1
-        ld (XPOS),a
+        ld a,(MAX_POS)
+        ld d,a
+        ld a,(POS)
+        cp d                            ; already MAX_POS position?
+        jp nz,INC_POS                   ; no, decrease position
+        ld a,0                          ; yes, wrap to list start pos
+        ld (POS),a                      ; store new value
+        jr AFTER_INC_POS
+INC_POS
+        inc a                           ; pos is < MAX so increment
+        ld (POS),a                      ; store new value
+AFTER_INC_POS
         jr DISPLAY_SPRITE
-HANDLE_UP
-        ld a,(YPOS)
-        cp $0                          ; is y at top?
-        jr z,CYCLE                      ; yes. can't move up any further
-        push af
-        call UNDISPLAY_SPRITE
-        pop af
-        sub a,$1
-        ld (YPOS),a                     ; and fall through..
+
+; HANDLE_LEFT
+;         ld a,(XPOS)
+;         cp $0                           ; is x at left?
+;         jr z,CYCLE                      ; yes. can't move left any further
+;         push af
+;         call UNDISPLAY_SPRITE
+;         pop af
+;         sub a,$2
+;         ld (XPOS),a
+;         jr DISPLAY_SPRITE
+; HANDLE_RIGHT
+;         ld a,(XPOS)
+;         cp $e7                          ; is x at right? 30d
+;         jr z,CYCLE                      ; yes. can't move right any further
+;         push af
+;         call UNDISPLAY_SPRITE
+;         pop af
+;         add a,$2
+;         ld (XPOS),a
+;         jr DISPLAY_SPRITE
+; HANDLE_UP
+;         ld a,(YPOS)
+;         cp $0                          ; is y at top?
+;         jr z,CYCLE                      ; yes. can't move up any further
+;         push af
+;         call UNDISPLAY_SPRITE
+;         pop af
+;         sub a,$2
+;         ld (YPOS),a                     ; and fall through..
 DISPLAY_SPRITE
         ld hl,UDG_LOCAL_DATA
-        ;halt
+        halt
         call SPRITE
 CYCLE
         jp GAME_LOOP
@@ -251,9 +287,12 @@ SPRIT3
         jr SPRIT0                       ; we've done the switch so transfer to screen.
 
 SPRITE
-        ld a,(XPOS)
+        ld ix,CIRCLE_POS                ; ix points to list of xy positions for circle
+        ld de,(POS)                     ; setup index into list
+        add ix,de                       ; add index to list address
+        ld a,(ix)                       ; find x coordinate at that position in list
         ld b,a
-        ld a,(YPOS)
+        ld a,(ix+1)                     ; find y coordinate at next position in list
         ld c,a
         ld (DISPX),bc                   ; store coords in dispx for now.
         call SCADD                      ; calculate screen address.
@@ -346,6 +385,8 @@ SCADD
         ld e,a                          ; hl = address of screen.
         ret
 
+MAX_POS defb 3                          ; 0, 1, 2, 3
+POS     defb 0                          ; index into circle pos for sprite
 XPOS    defb 0
 YPOS    defb 0
 DISPX   defb 0
@@ -363,6 +404,8 @@ UDG_LOCAL_DATA
     defb 7,  224,31, 248, 63, 252,127,254,127,254,255,255,255,255,255,255
 ;interleaved now: C0D0C1D1C2D2C3D3C4D4C5D5C6D6C7D7
     defb 255,255,255,255,243,255,115,254,127,254,63,252,31,248,7,224
+
+CIRCLE_POS  defb 120,24,40,96,124,64,200,92 ; x,y coords in a list
 
 PIXELS_START    EQU $4000               ; ZXSP SCREEN PIXELS
 ATTR_START      EQU $5800               ; ZXSP SCREEN ATTRIBUTES
