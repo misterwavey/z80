@@ -1,141 +1,19 @@
-; =======================================================================
-;  pixel sprite code largely taken from
-;  'how to write spectrum games' by jonathan caldwell
-;
-;  assemble using zasm 4 to create a .tap file:
-;    zasm -u cauldwell-pixel.asm
-;  load tap into emulator and it will run automatically
-;
-;  for other assemblers remove lines from 1 to up until around 110 and eg
-;    pasmo --tapbas cauldwell-pixel.asm cauldwell-pixel.tap
-;  load tap into emulator and from BASIC enter:
-;    RANDOMIZE USR 24000
-; =======================================================================
-
-; fill byte is 0x00
-; #code has an additional argument: the sync byte for the block.
-; The assembler calculates and appends checksum byte to each segment.
-; Note: If a segment is appended without an explicite address, then the sync byte and the checksum byte
-; of the preceding segment are not counted when calculating the start address of this segment.
-
-#target tap
-
-; sync bytes:
-HEADERFLAG:         equ 0
-DATAFLAG:           equ $ff
-
-; some Basic tokens:
-tCLEAR              equ     $FD         ; token CLEAR
-tLOAD               equ     $EF         ; token LOAD
-tCODE               equ     $AF         ; token CODE
-tPRINT              equ     $F5         ; token PRINT
-tRANDOMIZE          equ     $F9         ; token RANDOMIZE
-tUSR                equ     $C0         ; token USR
-tCLS                equ     $FB         ; token CLS
-
-; ---------------------------------------------------
-;        ram-based, non-initialized variables
-;        (note: 0x5B00 is the printer buffer)
-;        (note: system variables at 0x5C00 were initialized by Basic)
-; ---------------------------------------------------
-
-#data VARIABLES, PRINTER_BUFFER, 0x100
-
-; define some variables here
-
-; ---------------------------------------------------
-;        a Basic Loader:
-; ---------------------------------------------------
-
-#code PROG_HEADER,0,17,HEADERFLAG
-        defb    0                       ; Indicates a Basic program
-        defb    "sprite-p  "            ; the block name, 10 bytes long
-        defw    VARIABLES_END-0         ; length of block = length of basic program plus variables
-        defw    10                      ; line number for auto-start, 0x8000 if none
-        defw    PROGRAM_END-0           ; length of the basic program without variables
-
-
-#code PROG_DATA,0,*,DATAFLAG
-
-        ; ZX Spectrum Basic tokens
-
-; 10 CLEAR 23999
-        defb    0,10                    ; line number
-        defb    END10-($+1)             ; line length
-        defb    0                       ; statement number
-        defb    tCLEAR                  ; token CLEAR
-        defm    "23999",$0e0000bf5d00   ; number 23999, ascii & internal format
-END10:  defb    $0d                     ; line end marker
-
-; 20 LOAD "" CODE 24000
-        defb    0,20                    ; line number
-        defb    END20-($+1)             ; line length
-        defb    0                       ; statement number
-        defb    tLOAD,'"','"',tCODE     ; token LOAD, 2 quotes, token CODE
-        defm    "24000",$0e0000c05d00   ; number 24000, ascii & internal format
-END20:  defb    $0d                     ; line end marker
-
-; 30 CLS
-        defb    0,30                    ; line number
-        defb    END30-($+1)             ; line length
-        defb    0                       ; statement number
-        defb    tCLS                    ; token RANDOMIZE, token USR
-END30:  defb    $0d                     ; line end marker
-
-; 40 PRINT USR 24000
-        defb    0,40                    ; line number
-        defb    END40-($+1)             ; line length
-        defb    0                       ; statement number
-        defb    tRANDOMIZE,tUSR         ; token RANDOMIZE, token USR
-        defm    "24000",$0e0000c05d00   ; number 24000, ascii & internal format
-END40:  defb    $0d                     ; line end marker
-
-PROGRAM_END:
-
-        ; ZX Spectrum Basic variables
-
-VARIABLES_END:
-
-; ---------------------------------------------------
-;        a machine code block:
-; ---------------------------------------------------
-
-#code CODE_HEADER,0,17,HEADERFLAG
-        defb    3                       ; Indicates binary data
-        defb    "sprite-p-c"            ; the block name, 10 bytes long
-        defw    CODE_END-CODE_START     ; length of data block which follows
-        defw    CODE_START              ; default location for the data
-        defw    0                       ; unused
-
-#code CODE_DATA, CODE_START,*,DATAFLAG
-
-; Z80 assembler code and data
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; end of zasm .tap template header
+;; worm.asm
+;; zx spectrum game to escape from a wormhole in space
 ;;
-;; for other assemblers just copy from here onwards
-;; and use an org directive eg:
+;; pasmo --tapbas -d worm.asm worm.tap worm.map > worm.lis
 ;;
-;; org 24000
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+    org 24000
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; move a 2x2 sprite against a background
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+START
         call INIT_SCREEN
-        ld hl,UDG_LOCAL_DATA            ; sprite address.
-        ; ld a,160
-        ; ld c,a                          ; set x coordinate.
-        ; ld a,$50
-        ; ld b,a                          ; set y coordinate.
-        ; ld (XPOS),bc                    ; set up sprite routine coords.
-        ld a,0                          ;initial position in circle list
-        ld (POS),a
+        ld hl,SPRITE_DATA               ; sprite address.
+        ld a,0                          ; initial position in circle list
+        ld (POS),a                      ; store in variable
         push hl
         call SPRITE
         pop hl
@@ -148,26 +26,7 @@ GAME_LOOP
         jr z,HANDLE_RIGHT
         cp $22                          ; check for p key
         jr z,HANDLE_LEFT
-        ; cp $25                          ; check for q key
-        ; jr z,HANDLE_UP
-        ; cp $26                          ; check for a key
-        ; jr z,HANDLE_DOWN
-        cp $27                          ; check for capshift (left shift on mac) key
-        jr nz,CYCLE                     ; no match? loop again. otherwise fall through
-HANDLE_QUIT
-        ld a,$2
-        ld (DF_SZ),a                    ; restore lower part of screen to 2
-        ret                             ; return to BASIC
-; HANDLE_DOWN
-;         ld a,(YPOS)
-;         cp 170                          ; is y at bottom? 32d (we're 2 tall)
-;         jr z,CYCLE                      ; yes. can't move down any further
-;         push af
-;         call UNDISPLAY_SPRITE
-;         pop af
-;         add a,$2
-;         ld (YPOS),a
-;         jr DISPLAY_SPRITE
+        jr nz,CYCLE                     ; no match? loop again.
 HANDLE_LEFT
         push af
         call UNDISPLAY_SPRITE           ; undisplay current position
@@ -192,7 +51,7 @@ HANDLE_RIGHT
         ld d,a
         ld a,(POS)
         cp d                            ; already MAX_POS position?
-        jp nz,INC_POS                   ; no, decrease position
+        jp nz,INC_POS                   ; no, increase position
         ld a,0                          ; yes, wrap to list start pos
         ld (POS),a
         jr AFTER_INC_POS
@@ -200,45 +59,11 @@ INC_POS
         inc a                           ; pos is < MAX so increment
         ld (POS),a                      ; store new value
 AFTER_INC_POS
-        jr DISPLAY_SPRITE
-
-; HANDLE_LEFT
-;         ld a,(XPOS)
-;         cp $0                           ; is x at left?
-;         jr z,CYCLE                      ; yes. can't move left any further
-;         push af
-;         call UNDISPLAY_SPRITE
-;         pop af
-;         sub a,$2
-;         ld (XPOS),a
-;         jr DISPLAY_SPRITE
-; HANDLE_RIGHT
-;         ld a,(XPOS)
-;         cp $e7                          ; is x at right? 30d
-;         jr z,CYCLE                      ; yes. can't move right any further
-;         push af
-;         call UNDISPLAY_SPRITE
-;         pop af
-;         add a,$2
-;         ld (XPOS),a
-;         jr DISPLAY_SPRITE
-; HANDLE_UP
-;         ld a,(YPOS)
-;         cp $0                          ; is y at top?
-;         jr z,CYCLE                      ; yes. can't move up any further
-;         push af
-;         call UNDISPLAY_SPRITE
-;         pop af
-;         sub a,$2
-;         ld (YPOS),a                     ; and fall through..
 DISPLAY_SPRITE
-        ld hl,UDG_LOCAL_DATA
+        ld hl,SPRITE_DATA
         ;halt
         call SPRITE
 CYCLE
-delay   ld b,3          ; length of delay.
-delay0  halt            ; wait for an interrupt.
-        djnz delay0
         jp GAME_LOOP
 
         ;;
@@ -246,8 +71,8 @@ delay0  halt            ; wait for an interrupt.
         ;;
 
 UNDISPLAY_SPRITE
-        ld hl,UDG_LOCAL_DATA
-        ;halt
+        ld hl,SPRITE_DATA
+        halt
         call SPRITE                     ; remove old
         ret
 
@@ -259,13 +84,18 @@ INIT_SCREEN
         ld a,$2                         ; set printing to
         call $1601                      ; top part of screen
 
+        ld a,71                         ; white ink (7) on black paper (0), bright (64).
+        ld (ATTR_P),a                   ; set our screen colours.
+        xor a                           ; a := 0
+        call SET_BORDER                 ; permanent border ROM
+        call CLEAR_SCREEN               ; clear screen ROM
+
         ;call DRAW_BACKGROUND
         ret
 
 DRAW_BACKGROUND
-        ;; draw background
         ld a,AT_CONTROL                 ; set print position:
-        rst $10                         ; at
+        rst $10                         ; AT:
         ld a,$0
         rst $10                         ; 0,
         rst $10                         ; 0
@@ -298,18 +128,25 @@ SPRIT3
         jr SPRIT0                       ; we've done the switch so transfer to screen.
 
 SPRITE
-        ld ix,CIRCLE_POS                ; ix points to list of xy positions for circle
-        ld de,(POS)                     ; lookup index into list
-        push hl                         ; protect hl
-        ld hl,de                        ; store a copy of the index counter
-        add hl,de                       ; double the value because we've got 2 co ord
-        ld de,hl                        ; swap registers
-        pop hl                          ; restore hl
-        add ix,de                       ; add index to list address
-        ld a,(ix)                       ; find x coordinate at that position in list
-        ld b,a                          ; b:= y coord
-        ld a,(ix+1)                     ; find y coordinate at next position in list
-        ld c,a                          ; c:= x coord
+        push hl
+        ld a,(POS)                      ; lookup index into list of coords
+        ld d,a                          ; store index in d as a counter
+        xor a                           ; a:=0
+        ld hl,CIRCLE_POS                ; point bc at start of coords
+POS_LOOP
+        cp d                            ; is counter zero?
+        jr z,DONE_POS                   ; yes
+        inc hl                          ; no, move bc one 1 byte (y)
+        inc hl                          ; move bc on 1 more byte (x)
+        dec d                           ; decrement counter
+        jp POS_LOOP                     ; check if done
+DONE_POS
+        ld a,(hl)                       ; read y from low byte of hl
+        ld c,a                          ; copy into c
+        inc hl                          ; move hl on one byte
+        ld a,(hl)                       ; read x from low byte of hl
+        ld b,a                          ; copy into b
+        pop hl                          ; hl := sprite image addr
         ld (DISPX),bc                   ; store coords in dispx for now.
         call SCADD                      ; calculate screen address.
         ld a,16                         ; height of sprite in pixels.
@@ -409,20 +246,22 @@ DISPX   defb 0
 TMP0    defw 0
 SPRTMP  defw 0
 
-;; UDG characters
-UDG_LOCAL_DATA
+SPRITE_DATA
 ;; main sprite
     ; defb 7,    31,  63, 127, 127, 255, 255, 255 ; A top left
     ; defb 224, 248, 252, 254, 254, 255, 255, 255 ; B top right
     ; defb 255, 255, 243, 115, 127, 63,   31, 7   ; C bottom left
     ; defb 255, 255, 255, 254, 254, 252, 248, 224 ; D bottom right
-;interleaved now: A0B0A1B1A2B2A3B3A4B4A5B5A6B6A7B7
+;interleaved now: A0 B0 A1 B1 A2 B2 A3 B3 A4 B4 A5 B5 A6 B6 A7 B7
     defb 7,  224,31, 248, 63, 252,127,254,127,254,255,255,255,255,255,255
-;interleaved now: C0D0C1D1C2D2C3D3C4D4C5D5C6D6C7D7
+;interleaved now: C0 D0 C1 D1 C2 D2 C3 D3 C4 D4 C5 D5 C6 D6 C7 D7
     defb 255,255,255,255,243,255,115,254,127,254,63,252,31,248,7,224
 
-CIRCLE_POS  defb 120,24,  84,28,   68,40,   48,60,   40,96,  52,128, 68,148, 88,160
-            defb 120,164, 152,160, 180,144, 196,120, 200,96, 192,60, 180,44, 160,32  ; x,y coords in a list
+; CIRCLE_POS  defb 120,24,  84,28,   68,40,   48,60,   40,96,  52,128, 68,148, 88,160
+;             defb 120,164, 152,160, 180,144, 196,120, 200,96, 192,60, 180,44, 160,32  ; x,y coords in a list
+; above reversed
+CIRCLE_POS  defb 24,120,  28,84,   40,68,   60,48,   96,40,  128,52, 148,68, 160,88
+            defb 164,120, 160,152, 144,180, 120,196, 96,200, 60,192, 44,180, 32,160  ; x,y coords in a list
 
 PIXELS_START    EQU $4000               ; ZXSP SCREEN PIXELS
 ATTR_START      EQU $5800               ; ZXSP SCREEN ATTRIBUTES
@@ -455,6 +294,7 @@ DF_SZ           equ $5C6B
 UDGS            equ $5C7B
 DF_CC           equ $5c84
 S_POSN          equ $5c88
+ATTR_P          equ $5C8D ; permanent colours
 ATTR_T          equ $5C8F
 MEMBOT          equ $5C92
 
@@ -462,6 +302,8 @@ MEMBOT          equ $5C92
 KEY_SCAN        equ $028e
 KEY_TEST        equ $031e
 KEY_CODE        equ $0333
+CLEAR_SCREEN    equ $0DAF ; based on ATTR_P contents
+SET_BORDER      equ $229B
 
 
 ;; $028e.  5  KEY_SCAN   {001} the keyboard scanning subroutine
@@ -493,3 +335,4 @@ KEY_CODE        equ $0333
 ;; 0 23 35 00100011   P 22 34 00100010  EN 21 33 00100001  SP 20 32 00100000
 
 CODE_END:
+end 24000
