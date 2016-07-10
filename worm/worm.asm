@@ -11,156 +11,168 @@
 
 org 24000
 
+;;
+;; main game loop
+;;
+
 START
-        call INIT_SCREEN                ; setup screen
-        ld hl,SPRITE_DATA               ; sprite address.
-        ld a,0                          ; initial position in circle list
-        ld (POS),a                      ; store in variable
-        ld a,$0A
-        ld (PULSE_RADIUS), a            ; variable for growing circle
-        push hl
-        call SPRITE
-        pop hl
+    call INIT_SCREEN            ; setup screen
+    ld hl,SPRITE_DATA           ; sprite address.
+    xor a                       ; a:=0 initial position in circle list
+    ld (POS),a                  ; store in variable
+    ld a,$0A
+    ld (PULSE_RADIUS),a         ; variable for growing circle
+    push hl
+    call SPRITE
+    pop hl
 GAME_LOOP
-        call KEY_SCAN
-        inc d
-        jr nz,CYCLE                     ; Don't move if more than one key pressed.
-        ld a,e                          ; a: = key code of key pressed (ff if none).
-        cp $1a                          ; check for o key
-        jr z,HANDLE_RIGHT
-        cp $22                          ; check for p key
-        jr z,HANDLE_LEFT
-        jr nz,CYCLE                     ; no match? loop again.
+    call KEY_SCAN
+    inc d
+    jr nz,CYCLE                 ; Don't move if more than one key pressed.
+    ld a,e                      ; a: = key code of key pressed (ff if none).
+    cp $1a                      ; check for o key
+    jr z,HANDLE_RIGHT
+    cp $22                      ; check for p key
+    jr z,HANDLE_LEFT
+    jr nz,CYCLE                 ; no match? loop again.
 HANDLE_LEFT
-        push af
-        call UNDISPLAY_SPRITE           ; undisplay current position
-        pop af
-        ld a,(POS)                      ; find current position in list
-        cp 0                            ; already 0 position?
-        jp nz,DEC_POS                   ; no, decrease position
-        ld a,(MAX_POS)                  ; yes, wrap to max list pos
-        ld (POS),a                      ; store new value
-        jr AFTER_DEC_POS
+    push af
+    call UNDISPLAY_SPRITE       ; undisplay current position
+    pop af
+    ld a,(POS)                  ; find current position in list
+    cp 0                        ; already 0 position?
+    jp nz,DEC_POS               ; no, decrease position
+    ld a,(MAX_POS)              ; yes, wrap to max list pos
+    ld (POS),a                  ; store new value
+    jr AFTER_DEC_POS
 DEC_POS
-        dec a                           ; pos is > 0 so decrement
-        ld (POS),a                      ; store new value
+    dec a                       ; pos is > 0 so decrement
+    ld (POS),a                  ; store new value
 AFTER_DEC_POS
-        jr DISPLAY_SPRITE
+    jr DISPLAY_SPRITE
 HANDLE_RIGHT
-        push af
-        call UNDISPLAY_SPRITE           ; undisplay current position
-        pop af
-        ld a,(MAX_POS)
-        ld d,a
-        ld a,(POS)
-        cp d                            ; already MAX_POS position?
-        jp nz,INC_POS                   ; no, increase position
-        ld a,0                          ; yes, wrap to list start pos
-        ld (POS),a
-        jr AFTER_INC_POS
+    push af
+    call UNDISPLAY_SPRITE       ; undisplay current position
+    pop af
+    ld a,(MAX_POS)
+    ld d,a
+    ld a,(POS)
+    cp d                        ; already MAX_POS position?
+    jp nz,INC_POS               ; no, increase position
+    ld a,0                      ; yes, wrap to list start pos
+    ld (POS),a
+    jr AFTER_INC_POS
 INC_POS
-        inc a                           ; pos is < MAX so increment
-        ld (POS),a                      ; store new value
+    inc a                       ; pos is < MAX so increment
+    ld (POS),a                  ; store new value
 AFTER_INC_POS
 DISPLAY_SPRITE
-        ld hl,SPRITE_DATA
-        ;halt
-        call SPRITE
+    ld hl,SPRITE_DATA
+    ;halt
+    call SPRITE
 CYCLE
-        call TUNNEL
-        call PULSE_WAIT
-        ;call FRAME_WAIT
-        jp GAME_LOOP
+    call TUNNEL
+    call PULSE_WAIT
+    ;call FRAME_WAIT
+    jp GAME_LOOP
 
-        ;;
-        ;; subroutines
-        ;;
+;;
+;; subroutines
+;;
 
 PULSE_WAIT
-        ld hl,PULSE_TIME
-        ld a,(FRAMES)                   ; current timer setting.
-        sub (hl)
-        cp 50                           ; 1 second
-        jr nc,PULSE_READY
-        ret
+    ld hl,PULSE_TIME
+    ld a,(FRAMES)               ; current timer setting.
+    sub (hl)
+    cp 50                       ; 1 second
+    jr nc,PULSE_READY
+    ret
 PULSE_READY
-        ld a,(PULSE_RADIUS)             ; current size
-        inc a                           ; make bigger
-        ld (PULSE_RADIUS),a             ; store
-        xor a                           ; a := 0
-        ld a,(FRAMES)
-        ld (PULSE_TIME),a               ; reset pulse wait
-        ret
+    ld a,(PULSE_RADIUS)         ; current size
+    add a,$10                   ; make bigger
+    ld (PULSE_RADIUS),a         ; store
+    xor a                       ; a := 0
+    ld a,(FRAMES)
+    ld (PULSE_TIME),a           ; reset pulse wait
+    ret
 
 FRAME_WAIT
-        ld hl,PREV_TIME                 ; previous time setting
-        ld a,(FRAMES)                   ; current timer setting.
-        sub (hl)                        ; difference between the two.
-        cp 2                            ; have two frames elapsed yet?
-        jr nc,FRAME_DONE                ; yes, no more delay.
-        jp FRAME_WAIT
+    ld hl,PREV_TIME             ; previous time setting
+    ld a,(FRAMES)               ; current timer setting.
+    sub (hl)                    ; difference between the two.
+    cp 2                        ; have two frames elapsed yet?
+    jr nc,FRAME_DONE            ; yes, no more delay.
+    jp FRAME_WAIT
 FRAME_DONE
-        ld a,(FRAMES)                   ; current timer.
-        ld (hl),a                       ; store in PRETIM
-        ret
+    ld a,(FRAMES)               ; current timer.
+    ld (hl),a                   ; store in PRETIM
+    ret
 
 UNDISPLAY_SPRITE
-        ld hl,SPRITE_DATA
-        halt
-        call SPRITE                     ; remove old
-        ret
+    ld hl,SPRITE_DATA
+    halt
+    call SPRITE                 ; remove old
+    ret
 
 TUNNEL
-        ld a,128                        ; x centre
-        ld (PULSE_X),a
-        ld a,96                         ; y centre
-        ld (PULSE_Y),a
-        ld a,(PULSE_RADIUS)
-        call CIRCLE                     ; circle at x,y with radius
-        ret
+    ld a,128                    ; x centre
+    ld (PULSE_X),a
+    ld a,96                     ; y centre
+    ld (PULSE_Y),a
+    ld a,(PULSE_RADIUS)
+    call CIRCLE                 ; circle at x,y with radius
+    ret
 
 INIT_SCREEN
-        ld a,0
-        ld (DF_SZ),a                    ; set lower part of screen to 0 size so we get 24 lines
+    ld a,0
+    ld (DF_SZ),a                ; set lower part of screen to 0 size so we get 24 lines
 
-        ld a,$2                         ; set printing to
-        call $1601                      ; top part of screen
+    ld a,$2                     ; set printing to
+    call $1601                  ; top part of screen
 
-        ld a,71                         ; white ink (7) on black paper (0), bright (64).
-        ld (ATTR_P),a                   ; set our screen colours.
-        xor a                           ; a := 0
-        call SET_BORDER                 ; permanent border ROM
-        call CLEAR_SCREEN               ; clear screen ROM
+    ld a,71                     ; white ink (7) on black paper (0), bright (64).
+    ld (ATTR_P),a               ; set our screen colours.
+    xor a                       ; a := 0
+    call SET_BORDER             ; permanent border ROM
+    call CLEAR_SCREEN           ; clear screen ROM
 
-        ;call DRAW_BACKGROUND           ; fill screen with dots to test xor sprite
-        ret
+    ;call DRAW_BACKGROUND        ; fill screen with dots to test xor sprite
+    ret
 
 DRAW_BACKGROUND
-        ld a,AT_CONTROL                 ; set print position:
-        rst $10                         ; AT:
-        ld a,$0
-        rst $10                         ; 0,
-        rst $10                         ; 0
-        ld de,704d                      ; 22d*34d = characters in background
+    ld a,AT_CONTROL              ; set print position:
+    rst $10                      ; AT:
+    ld a,$0
+    rst $10                      ; 0,
+    rst $10                      ; 0
+    ld de,704d                   ; 22d*34d = characters in background
 DRAW_BACKGROUND_CHAR
-        ld a,'.'
-        rst $10
-        dec de
-        ld a,d
-        or e
-        jp nz,DRAW_BACKGROUND_CHAR
-        ret
+    ld a,'.'
+    rst $10
+    dec de
+    ld a,d
+    or e
+    jp nz,DRAW_BACKGROUND_CHAR
+    ret
 
-MAX_POS         defb 15                 ; 0, 1, 2, 3
-POS             defb 0                  ; index into circle pos for sprite
-DISPX           defb 0                  ; tmp for SPRITE routine
-TMP0            defw 0                  ; tmp for SPRITE routine
-SPRTMP          defw 0                  ; tmp for SPRITE routine
-PULSE_RADIUS    defb 0                  ; growing circle in tunnel
-PULSE_X         defb 0                  ;
-PULSE_Y         defb 0                  ; coordinates
-PREV_TIME       defb 0                  ; last recorded frame count
-PULSE_TIME      defb 0                  ; last frame we did a pulse
+;;
+;; variables
+;;
+
+MAX_POS         defb 15          ; 0, 1, 2, 3
+POS             defb 0           ; index into circle pos for sprite
+DISPX           defb 0           ; tmp for SPRITE routine
+TMP0            defw 0           ; tmp for SPRITE routine
+SPRTMP          defw 0           ; tmp for SPRITE routine
+PULSE_RADIUS    defb 0           ; growing circle in tunnel
+PULSE_X         defb 0           ;
+PULSE_Y         defb 0           ; coordinates
+PREV_TIME       defb 0           ; last recorded frame count
+PULSE_TIME      defb 0           ; last frame we did a pulse
+
+;;
+;; supporting source files
+;;
 
 INCLUDE defs.asm
 INCLUDE circle.asm
