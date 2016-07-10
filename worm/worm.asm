@@ -1,19 +1,23 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; worm.asm
 ;; zx spectrum game to escape from a wormhole in space
 ;;
-;; pasmo --tapbas -d worm.asm worm.tap worm.map > worm.lis
+;; assemble using:
+;;    pasmo --tapbas -d worm.asm worm.tap worm.map > worm.lis
+;; then open the worm.tap in any emulator
 ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
     org 24000
 
 START
-        call INIT_SCREEN
+        call INIT_SCREEN                ; setup screen
         ld hl,SPRITE_DATA               ; sprite address.
         ld a,0                          ; initial position in circle list
         ld (POS),a                      ; store in variable
+        ld a,$0A
+        ld (PULSE_RADIUS), a            ; variable for growing circle
         push hl
         call SPRITE
         pop hl
@@ -64,6 +68,7 @@ DISPLAY_SPRITE
         ;halt
         call SPRITE
 CYCLE
+        call TUNNEL
         jp GAME_LOOP
 
         ;;
@@ -74,6 +79,20 @@ UNDISPLAY_SPRITE
         ld hl,SPRITE_DATA
         halt
         call SPRITE                     ; remove old
+        ret
+
+TUNNEL
+        ld a,128
+        ld (PULSE_X),a
+        ld a,96
+        ld (PULSE_Y),a
+        ld a,(PULSE_RADIUS)
+    buc:
+        ld (PULSE_RADIUS),a
+        call CIRCLE
+        ; inc a
+        ; cp 90
+        ; jr nz,buc
         ret
 
 INIT_SCREEN
@@ -238,13 +257,14 @@ SCADD
         ld e,a                          ; hl = address of screen.
         ret
 
-MAX_POS defb 15                        ; 0, 1, 2, 3
-POS     defb 0                          ; index into circle pos for sprite
-XPOS    defb 0
-YPOS    defb 0
-DISPX   defb 0
-TMP0    defw 0
-SPRTMP  defw 0
+MAX_POS         defb 15                 ; 0, 1, 2, 3
+POS             defb 0                  ; index into circle pos for sprite
+DISPX           defb 0                  ; tmp for SPRITE routine
+TMP0            defw 0                  ; tmp for SPRITE routine
+SPRTMP          defw 0                  ; tmp for SPRITE routine
+PULSE_RADIUS    defb 0                  ; growing circle in tunnel
+PULSE_X         defb 0                  ;
+PULSE_Y         defb 0                  ; coordinates
 
 SPRITE_DATA
 ;; main sprite
@@ -262,6 +282,8 @@ SPRITE_DATA
 ; above reversed
 CIRCLE_POS  defb 24,120,  28,84,   40,68,   60,48,   96,40,  128,52, 148,68, 160,88
             defb 164,120, 160,152, 144,180, 120,196, 96,200, 60,192, 44,180, 32,160  ; x,y coords in a list
+
+INCLUDE circle.asm
 
 PIXELS_START    EQU $4000               ; ZXSP SCREEN PIXELS
 ATTR_START      EQU $5800               ; ZXSP SCREEN ATTRIBUTES
