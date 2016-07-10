@@ -69,7 +69,7 @@ DISPLAY_SPRITE
 CYCLE
         call TUNNEL
         call PULSE_WAIT
-        ;ocall FRAME_WAIT
+        ;call FRAME_WAIT
         jp GAME_LOOP
 
         ;;
