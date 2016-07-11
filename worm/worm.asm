@@ -20,7 +20,7 @@ START
     ld hl,SPRITE_DATA           ; sprite address.
     xor a                       ; a:=0 initial position in circle list
     ld (POS),a                  ; store in variable
-    ld a,$0A
+    ld a,$06
     ld (PULSE_RADIUS),a         ; variable for growing circle
     push hl
     call SPRITE
@@ -67,6 +67,30 @@ INC_POS
     ld (POS),a                  ; store new value
 AFTER_INC_POS
 DISPLAY_SPRITE
+    ld c,12                     ; paint attr 15,12
+    ld b,15
+    ld (DISPX), bc
+    call ATADD                  ; put attr address in de
+    ld a,68                     ; green ink (4) on black paper (0)
+    ld (de),a                   ; set colour
+    ld c,12                     ; paint attr 15,12
+    ld b,16
+    ld (DISPX), bc
+    call ATADD                  ; put attr address in de
+    ld a,68                     ; green ink (4) on black paper (0)
+    ld (de),a                   ; set colour
+    ld c,11                     ; paint attr 15,12
+    ld b,15
+    ld (DISPX), bc
+    call ATADD                  ; put attr address in de
+    ld a,68                     ; green ink (4) on black paper (0)
+    ld (de),a                   ; set colour
+    ld c,11                     ; paint attr 15,12
+    ld b,16
+    ld (DISPX), bc
+    call ATADD                  ; put attr address in de
+    ld a,68                     ; green ink (4) on black paper (0)
+    ld (de),a                   ; set colour
     ld hl,SPRITE_DATA
     ;halt
     call SPRITE
@@ -89,7 +113,7 @@ PULSE_WAIT
     ret
 PULSE_READY
     ld a,(PULSE_RADIUS)         ; current size
-    add a,$10                   ; make bigger
+    add a,$08                   ; make bigger
     ld (PULSE_RADIUS),a         ; store
     xor a                       ; a := 0
     ld a,(FRAMES)
@@ -177,6 +201,7 @@ PULSE_TIME      defb 0           ; last frame we did a pulse
 INCLUDE defs.asm
 INCLUDE circle.asm
 INCLUDE sprite.asm
+INCLUDE screen.asm
 
 ;; $028e.  5  KEY_SCAN   {001} the keyboard scanning subroutine
 ;; On returning from $028e KEY_SCAN the DE register and the Zero flag indicate
