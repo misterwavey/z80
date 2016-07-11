@@ -18,13 +18,17 @@ org 24000
 START
     call INIT_SCREEN            ; setup screen
     ld hl,SPRITE_DATA           ; sprite address.
+
+    ld a,1
+    ld (PULSE_COUNT),a          ; initialise count
+
     xor a                       ; a:=0 initial position in circle list
     ld (POS),a                  ; store in variable
-    ld a,$06
-    ld (PULSE_RADIUS),a         ; variable for growing circle
     push hl
     call SPRITE
     pop hl
+
+    call TUNNEL_DRAW
 GAME_LOOP
     call KEY_SCAN
     inc d
@@ -71,8 +75,7 @@ DISPLAY_SPRITE
     ;halt
     call SPRITE
 CYCLE
-    call TUNNEL
-    call PULSE_WAIT
+    call PULSE_TIMING
     ;call FRAME_WAIT
     jp GAME_LOOP
 
@@ -80,23 +83,99 @@ CYCLE
 ;; subroutines
 ;;
 
-PULSE_WAIT
+PULSE_TIMING
     ld hl,PULSE_TIME
     ld a,(FRAMES)               ; current timer setting.
     sub (hl)
-    cp 25                       ; 1 second
+    cp 25                       ; 1/2 second
     jr nc,PULSE_READY
     ret
 PULSE_READY
-    ld a,0
-    ld (PULSE_DRAWN),a
-
-    ld a,(PULSE_RADIUS)         ; current size
-    add a,$08                   ; make bigger
-    ld (PULSE_RADIUS),a         ; store
-    xor a                       ; a := 0
+    ld a,(PULSE_COUNT)
+    push af
+    cp 1
+    jp z,HANDLE_PULSE_1
+    cp 2
+    jp z,HANDLE_PULSE_2
+    cp 3
+    jp z,HANDLE_PULSE_3
+    cp 4
+    jp z,HANDLE_PULSE_4
+    jp PULSE_DONE
+HANDLE_PULSE_1
+    call SHOW_PULSE1
+    jp PULSE_DONE
+HANDLE_PULSE_2
+    call SHOW_PULSE2
+    jp PULSE_DONE
+HANDLE_PULSE_3
+    call SHOW_PULSE3
+    jp PULSE_DONE
+HANDLE_PULSE_4
+    call SHOW_PULSE4
+    jp PULSE_DONE
+PULSE_DONE
+    pop af
+    inc a
+    ld (PULSE_COUNT),a
     ld a,(FRAMES)
     ld (PULSE_TIME),a           ; reset pulse wait
+    ret
+
+;;
+;; hl must point to bytes array [y,x,colour,[rpt],0]
+;;
+SET_ATTR_BYTES
+    ld (DISPX),hl               ; store bytes 1 & 2 as y,x
+    push hl
+    CALL ATADD                  ; de := attr address
+    pop hl
+    inc hl                      ; point at byte 2
+    inc hl                      ; point at byte 3
+    ld a,(hl)                   ; a := byte 3
+    ld (de),a                   ; set colour at attr address
+    inc hl                      ; point at byte 4
+    ld a,(hl)                   ; a := byte 4
+    cp 0                        ; is it a zero?
+    jp nz,SET_ATTR_BYTES        ; if no repeat until zero found
+    ret
+
+HIDE_PULSE1
+    ld hl,PULSE_1_ATTRS
+    call SET_ATTR_BYTES
+    ret
+
+HIDE_PULSE2
+    ret
+
+HIDE_PULSE3
+    ret
+
+HIDE_PULSE4
+    ret
+
+SHOW_PULSE1
+    call HIDE_PULSE2
+    call HIDE_PULSE3
+    call HIDE_PULSE4
+    ret
+
+SHOW_PULSE2
+    call HIDE_PULSE1
+    call HIDE_PULSE3
+    call HIDE_PULSE4
+    ret
+
+SHOW_PULSE3
+    call HIDE_PULSE1
+    call HIDE_PULSE2
+    call HIDE_PULSE4
+    ret
+
+SHOW_PULSE4
+    call HIDE_PULSE1
+    call HIDE_PULSE2
+    call HIDE_PULSE3
     ret
 
 FRAME_WAIT
@@ -117,19 +196,24 @@ UNDISPLAY_SPRITE
     call SPRITE                 ; remove old
     ret
 
-TUNNEL
-    ld a,(PULSE_DRAWN)
-    cp 0
-    jp nz,TUNNEL_DONE
+;; TODO attributes to black for old pulses
+TUNNEL_DRAW
     ld a,128                    ; x centre
     ld (PULSE_X),a
     ld a,96                     ; y centre
     ld (PULSE_Y),a
-    ld a,(PULSE_RADIUS)
+    ld a,16
+    ld (PULSE_RADIUS),a
     call CIRCLE                 ; circle at x,y with radius
-    ld a,1
-    ld (PULSE_DRAWN),a
-TUNNEL_DONE
+    ld a,32
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
+    ld a,48
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
+    ld a,64
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
     ret
 
 INIT_SCREEN
@@ -164,6 +248,10 @@ DRAW_BACKGROUND_CHAR
     jp nz,DRAW_BACKGROUND_CHAR
     ret
 
+PULSE_1_ATTRS
+    defb 12,15,68,11,14,68,10,13,68,09,12,68,08,11,68,0
+
+
 ;;
 ;; variables
 ;;
@@ -173,10 +261,14 @@ POS             defb 0           ; index into circle pos for sprite
 DISPX           defb 0           ; tmp for SPRITE routine
 TMP0            defw 0           ; tmp for SPRITE routine
 SPRTMP          defw 0           ; tmp for SPRITE routine
-PULSE_RADIUS    defb 0           ; growing circle in tunnel
+PULSE1_HIDDEN   defb 1           ; growing circle in tunnel
+PULSE2_HIDDEN   defb 1           ; growing circle in tunnel
+PULSE3_HIDDEN   defb 1           ; growing circle in tunnel
+PULSE4_HIDDEN   defb 1           ; growing circle in tunnel
+PULSE_COUNT     defb 0
 PULSE_X         defb 0           ;
 PULSE_Y         defb 0           ; coordinates
-PULSE_DRAWN     defb 0
+PULSE_RADIUS    defb 0
 PREV_TIME       defb 0           ; last recorded frame count
 PULSE_TIME      defb 0           ; last frame we did a pulse
 
