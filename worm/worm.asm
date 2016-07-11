@@ -67,30 +67,6 @@ INC_POS
     ld (POS),a                  ; store new value
 AFTER_INC_POS
 DISPLAY_SPRITE
-    ld c,12                     ; paint attr 15,12
-    ld b,15
-    ld (DISPX), bc
-    call ATADD                  ; put attr address in de
-    ld a,68                     ; green ink (4) on black paper (0)
-    ld (de),a                   ; set colour
-    ld c,12                     ; paint attr 15,12
-    ld b,16
-    ld (DISPX), bc
-    call ATADD                  ; put attr address in de
-    ld a,68                     ; green ink (4) on black paper (0)
-    ld (de),a                   ; set colour
-    ld c,11                     ; paint attr 15,12
-    ld b,15
-    ld (DISPX), bc
-    call ATADD                  ; put attr address in de
-    ld a,68                     ; green ink (4) on black paper (0)
-    ld (de),a                   ; set colour
-    ld c,11                     ; paint attr 15,12
-    ld b,16
-    ld (DISPX), bc
-    call ATADD                  ; put attr address in de
-    ld a,68                     ; green ink (4) on black paper (0)
-    ld (de),a                   ; set colour
     ld hl,SPRITE_DATA
     ;halt
     call SPRITE
@@ -108,10 +84,13 @@ PULSE_WAIT
     ld hl,PULSE_TIME
     ld a,(FRAMES)               ; current timer setting.
     sub (hl)
-    cp 50                       ; 1 second
+    cp 25                       ; 1 second
     jr nc,PULSE_READY
     ret
 PULSE_READY
+    ld a,0
+    ld (PULSE_DRAWN),a
+
     ld a,(PULSE_RADIUS)         ; current size
     add a,$08                   ; make bigger
     ld (PULSE_RADIUS),a         ; store
@@ -139,12 +118,18 @@ UNDISPLAY_SPRITE
     ret
 
 TUNNEL
+    ld a,(PULSE_DRAWN)
+    cp 0
+    jp nz,TUNNEL_DONE
     ld a,128                    ; x centre
     ld (PULSE_X),a
     ld a,96                     ; y centre
     ld (PULSE_Y),a
     ld a,(PULSE_RADIUS)
     call CIRCLE                 ; circle at x,y with radius
+    ld a,1
+    ld (PULSE_DRAWN),a
+TUNNEL_DONE
     ret
 
 INIT_SCREEN
@@ -191,6 +176,7 @@ SPRTMP          defw 0           ; tmp for SPRITE routine
 PULSE_RADIUS    defb 0           ; growing circle in tunnel
 PULSE_X         defb 0           ;
 PULSE_Y         defb 0           ; coordinates
+PULSE_DRAWN     defb 0
 PREV_TIME       defb 0           ; last recorded frame count
 PULSE_TIME      defb 0           ; last frame we did a pulse
 
