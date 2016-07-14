@@ -29,6 +29,10 @@ START
     pop hl
 
     call TUNNEL_DRAW
+    call HIDE_PULSE1
+    call HIDE_PULSE2
+    call HIDE_PULSE3
+    call HIDE_PULSE4
 GAME_LOOP
     call KEY_SCAN
     inc d
@@ -87,11 +91,17 @@ CYCLE
 ;; subroutines
 ;;
 
+UNDISPLAY_SPRITE
+    ld hl,SPRITE_DATA
+    halt
+    call SPRITE                 ; remove old
+    ret
+
 PULSE_TIMING
     ld hl,PULSE_TIME            ; time of last check
     ld a,(FRAMES)               ; current timer setting.
     sub (hl)
-    cp 50                       ; 1 second
+    cp 15                       ; 1 second
     jr nc,PULSE_READY           ; window exceeded?
     ret                         ; no, end sub
 PULSE_READY                     ; yes
@@ -113,13 +123,6 @@ HANDLE_PULSE_2
     call SHOW_PULSE2
     jp PULSE_DONE
 HANDLE_PULSE_3
-    call DEBUG_SPACE
-    call DEBUGXSP
-    call DEBUGXSP
-    call DEBUGXSP
-    call DEBUGXSP
-    call DEBUGXSP
-    call DEBUGXSP
     call SHOW_PULSE3
     jp PULSE_DONE
 HANDLE_PULSE_4
@@ -154,48 +157,54 @@ SET_ATTR_BYTES
 
 HIDE_PULSE1
     ; call DEBUGX
-    ld hl,PULSE_1_ATTRS
+    ld hl,PULSE_1_ATTRS_OFF
     call SET_ATTR_BYTES
     ret
 
 HIDE_PULSE2
     ; call DEBUGX
-    ld hl,PULSE_2_ATTRS
+    ld hl,PULSE_2_ATTRS_OFF
     call SET_ATTR_BYTES
     ret
 
 HIDE_PULSE3
-    ld hl,PULSE_3_ATTRS
+    ld hl,PULSE_3_ATTRS_OFF
     call SET_ATTR_BYTES
     ret
 
 HIDE_PULSE4
-    cp 0
+    ld hl,PULSE_4_ATTRS_OFF
+    call SET_ATTR_BYTES
     ret
 
 SHOW_PULSE1
     call DEBUG1
     ; TODO SHOW 1
+    ld hl,PULSE_1_ATTRS_ON
+    call SET_ATTR_BYTES
     call HIDE_PULSE4
     ret
 
 SHOW_PULSE2
     call DEBUG2
-
+    ld hl,PULSE_2_ATTRS_ON
+    call SET_ATTR_BYTES
     call HIDE_PULSE1
     ; TODO SHOW 2
     ret
 
 SHOW_PULSE3
     call DEBUG3
-
+    ld hl,PULSE_3_ATTRS_ON
+    call SET_ATTR_BYTES
     call HIDE_PULSE2
     ; TODO SHOW 3
     ret
 
 SHOW_PULSE4
     call DEBUG4
-
+    ld hl,PULSE_4_ATTRS_ON
+    call SET_ATTR_BYTES
     call HIDE_PULSE3
     ; TODO SHOW 4
     ret
@@ -212,11 +221,6 @@ FRAME_DONE
     ld (hl),a                   ; store in PRETIM
     ret
 
-UNDISPLAY_SPRITE
-    ld hl,SPRITE_DATA
-    halt
-    call SPRITE                 ; remove old
-    ret
 
 ;; TODO attributes to black for old pulses
 TUNNEL_DRAW
@@ -233,27 +237,27 @@ TUNNEL_DRAW
     ld a,23
     ld (PULSE_RADIUS),a
     call CIRCLE                 ; circle at x,y with radius
-    ld a,39
+    ld a,35
     ld (PULSE_RADIUS),a
     call CIRCLE                 ; circle at x,y with radius
-    ld a,47
-    ld (PULSE_RADIUS),a
-    call CIRCLE                 ; circle at x,y with radius
-    ld a,55
-    ld (PULSE_RADIUS),a
-    call CIRCLE                 ; circle at x,y with radius
-    ld a,63
-    ld (PULSE_RADIUS),a
-    call CIRCLE                 ; circle at x,y with radius
-    ld a,71
-    ld (PULSE_RADIUS),a
-    call CIRCLE                 ; circle at x,y with radius
-    ld a,79
-    ld (PULSE_RADIUS),a
-    call CIRCLE                 ; circle at x,y with radius
-    ld a,87
-    ld (PULSE_RADIUS),a
-    call CIRCLE                 ; circle at x,y with radius
+    ; ld a,
+    ; ld (PULSE_RADIUS),a
+    ; call CIRCLE                 ; circle at x,y with radius
+    ; ld a,55
+    ; ld (PULSE_RADIUS),a
+    ; call CIRCLE                 ; circle at x,y with radius
+    ; ld a,63
+    ; ld (PULSE_RADIUS),a
+    ; call CIRCLE                 ; circle at x,y with radius
+    ; ld a,71
+    ; ld (PULSE_RADIUS),a
+    ; call CIRCLE                 ; circle at x,y with radius
+    ; ld a,79
+    ; ld (PULSE_RADIUS),a
+    ; call CIRCLE                 ; circle at x,y with radius
+    ; ld a,87
+    ; ld (PULSE_RADIUS),a
+    ; call CIRCLE                 ; circle at x,y with radius
     ret
 
 INIT_SCREEN
@@ -288,22 +292,73 @@ DRAW_BACKGROUND_CHAR
     jp nz,DRAW_BACKGROUND_CHAR
     ret
 
-PULSE_1_ATTRS
-    defb 11,15,59,11,16,59,12,15,59,12,16,59,255
+PULSE_1_ATTRS_OFF
+    defb 11,15,0,11,16,0
+    defb 12,15,0,12,16,0
+    defb 255
 
-PULSE_2_ATTRS
-    defb 10,14,59,10,15,59,10,16,59,10,17,59
-    defb 11,14,59,11,17,59
-    defb 12,14,59,12,17,59
-    defb 13,14,59,13,15,59,13,16,59,13,17,59,255
+PULSE_1_ATTRS_ON
+    defb 11,15,7,11,16,7
+    defb 12,15,7,12,16,7
+    defb 255
 
-PULSE_3_ATTRS
-    defb 09,13,59,09,14,59,09,15,59,09,16,59,09,17,59,09,18,59
-    defb 10,13,59,10,18,59
-    defb 11,13,59,11,18,59
-    defb 12,13,59,12,18,59
-    defb 13,13,59,13,18,59
-    defb 14,13,59,14,14,59,14,15,59,14,16,59,14,17,59,14,18,59,255
+PULSE_2_ATTRS_OFF
+    defb 10,14,0,10,15,0,10,16,0,10,17,0
+    defb 11,14,0,11,17,0
+    defb 12,14,0,12,17,0
+    defb 13,14,0,13,15,0,13,16,0,13,17,0
+    defb 255
+
+PULSE_2_ATTRS_ON
+    defb 10,14,7,10,15,7,10,16,7,10,17,7
+    defb 11,14,7,11,17,7
+    defb 12,14,7,12,17,7
+    defb 13,14,7,13,15,7,13,16,7,13,17,7
+    defb 255
+
+PULSE_3_ATTRS_OFF
+    defb 09,13,0,09,14,0,09,15,0,09,16,0,09,17,0,09,18,0
+    defb 10,13,0,10,18,0
+    defb 11,13,0,11,18,0
+    defb 12,13,0,12,18,0
+    defb 13,13,0,13,18,0
+    defb 14,13,0,14,14,0,14,15,0,14,16,0,14,17,0,14,18,0
+    defb 255
+
+PULSE_3_ATTRS_ON
+    defb 09,13,7,09,14,7,09,15,7,09,16,7,09,17,7,09,18,7
+    defb 10,13,7,10,18,7
+    defb 11,13,7,11,18,7
+    defb 12,13,7,12,18,7
+    defb 13,13,7,13,18,7
+    defb 14,13,7,14,14,7,14,15,7,14,16,7,14,17,7,14,18,7
+    defb 255
+
+PULSE_4_ATTRS_OFF
+    defb 07,12,0,07,13,0,07,14,0,07,15,0,07,16,0,07,17,0,07,18,0
+    defb 08,12,0,8,13,0,08,17,0,08,18,0,08,19,0
+    defb 09,11,0,09,12,0,09,19,0
+    defb 10,11,0,10,19,0,10,20,0
+    defb 11,11,0,11,20,0
+    defb 12,11,0,12,20,0
+    defb 13,11,0,13,12,0,13,19,0,13,20,0
+    defb 14,12,0,14,19,0
+    defb 15,12,0,15,13,0,15,14,0,15,17,0,15,18,0,15,19,0
+    defb 16,13,0,16,14,0,16,15,0,16,16,0,16,17,0,16,18,0,16,19,0
+    defb 255
+
+PULSE_4_ATTRS_ON
+    defb 07,12,7,07,13,7,07,14,7,07,15,7,07,16,7,07,17,7,07,18,0
+    defb 08,12,7,8,13,7,08,17,7,08,18,7,08,19,7
+    defb 09,11,7,09,12,7,09,19,7
+    defb 10,11,7,10,19,7,10,20,7
+    defb 11,11,7,11,20,7
+    defb 12,11,7,12,20,7
+    defb 13,11,7,13,12,7,13,19,7,13,20,7
+    defb 14,12,7,14,19,7
+    defb 15,12,7,15,13,7,15,14,7,15,17,7,15,18,7,15,19,7
+    defb 16,13,7,16,14,7,16,15,7,16,16,7,16,17,7,16,18,7,16,19,7
+    defb 255
 
 ;;
 ;; variables
