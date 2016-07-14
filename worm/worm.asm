@@ -20,7 +20,7 @@ START
     ld hl,SPRITE_DATA           ; sprite address.
 
     ld a,1
-    ld (PULSE_COUNT),a          ; initialise count
+    ld (PULSE_COUNT),a          ; initialise pulse count to 1
 
     xor a                       ; a:=0 initial position in circle list
     ld (POS),a                  ; store in variable
@@ -38,7 +38,8 @@ GAME_LOOP
     jr z,HANDLE_RIGHT
     cp $22                      ; check for p key
     jr z,HANDLE_LEFT
-    jr nz,CYCLE                 ; no match? loop again.
+    jr CYCLE                    ; no match? end gameloop
+
 HANDLE_LEFT
     push af
     call UNDISPLAY_SPRITE       ; undisplay current position
@@ -54,14 +55,15 @@ DEC_POS
     ld (POS),a                  ; store new value
 AFTER_DEC_POS
     jr DISPLAY_SPRITE
+
 HANDLE_RIGHT
     push af
     call UNDISPLAY_SPRITE       ; undisplay current position
     pop af
     ld a,(MAX_POS)
-    ld d,a
-    ld a,(POS)
-    cp d                        ; already MAX_POS position?
+    ld d,a                      ; d := maxpos for comparison
+    ld a,(POS)                  ; a := current position
+    cp d                        ; current already at MAX_POS position?
     jp nz,INC_POS               ; no, increase position
     ld a,0                      ; yes, wrap to list start pos
     ld (POS),a
@@ -69,11 +71,13 @@ HANDLE_RIGHT
 INC_POS
     inc a                       ; pos is < MAX so increment
     ld (POS),a                  ; store new value
-AFTER_INC_POS
+AFTER_INC_POS                   ; fallthrough to DISPLAY_SPRITE
+
 DISPLAY_SPRITE
     ld hl,SPRITE_DATA
     ;halt
     call SPRITE
+
 CYCLE
     call PULSE_TIMING
     ;call FRAME_WAIT
@@ -84,14 +88,14 @@ CYCLE
 ;;
 
 PULSE_TIMING
-    ld hl,PULSE_TIME
+    ld hl,PULSE_TIME            ; time of last check
     ld a,(FRAMES)               ; current timer setting.
     sub (hl)
-    cp 25                       ; 1/2 second
-    jr nc,PULSE_READY
-    ret
-PULSE_READY
-    ld a,(PULSE_COUNT)
+    cp 50                       ; 1 second
+    jr nc,PULSE_READY           ; window exceeded?
+    ret                         ; no, end sub
+PULSE_READY                     ; yes
+    ld a,(PULSE_COUNT)          ; which pulse needs showing?
     push af
     cp 1
     jp z,HANDLE_PULSE_1
@@ -109,73 +113,91 @@ HANDLE_PULSE_2
     call SHOW_PULSE2
     jp PULSE_DONE
 HANDLE_PULSE_3
+    call DEBUG_SPACE
+    call DEBUGXSP
+    call DEBUGXSP
+    call DEBUGXSP
+    call DEBUGXSP
+    call DEBUGXSP
+    call DEBUGXSP
     call SHOW_PULSE3
     jp PULSE_DONE
 HANDLE_PULSE_4
-    call SHOW_PULSE4
-    jp PULSE_DONE
+    call SHOW_PULSE4            ; then fallthrough
 PULSE_DONE
     pop af
     inc a
-    ld (PULSE_COUNT),a
+    cp 5                        ; pulse needs resetting?
+    jp nz,PULSE_DONE_2
+    ld a,1                      ; yes
+PULSE_DONE_2                    ; no
+    ld (PULSE_COUNT),a          ; store
     ld a,(FRAMES)
     ld (PULSE_TIME),a           ; reset pulse wait
     ret
 
 ;;
-;; hl must point to bytes array [y,x,colour,[rpt],0]
+;; hl must point to attr array [y,x,colour,[rpt],0]
 ;;
 SET_ATTR_BYTES
-    ld (DISPX),hl               ; store bytes 1 & 2 as y,x
-    push hl
-    CALL ATADD                  ; de := attr address
-    pop hl
-    inc hl                      ; point at byte 2
-    inc hl                      ; point at byte 3
-    ld a,(hl)                   ; a := byte 3
-    ld (de),a                   ; set colour at attr address
-    inc hl                      ; point at byte 4
-    ld a,(hl)                   ; a := byte 4
-    cp 0                        ; is it a zero?
-    jp nz,SET_ATTR_BYTES        ; if no repeat until zero found
-    ret
+    ; call DEBUGXN
+    CALL ATADD                  ; after, de := attr address
+    inc hl                      ; point at byte 2 (y)
+    inc hl                      ; point at byte 3 (colour)
+    ld a,(hl)                   ; a := byte 3 (colour)
+    ld (de),a                   ; set colour of attr address
+    inc hl                      ; point at next byte
+    ld a,(hl)                   ; a := byte 1 of next attr def or 0
+    cp 255                      ; is it our end marker?
+    ret z                       ; yes end
+    jp SET_ATTR_BYTES           ; if no repeat until zero found
 
 HIDE_PULSE1
+    ; call DEBUGX
     ld hl,PULSE_1_ATTRS
     call SET_ATTR_BYTES
     ret
 
 HIDE_PULSE2
+    ; call DEBUGX
+    ld hl,PULSE_2_ATTRS
+    call SET_ATTR_BYTES
     ret
 
 HIDE_PULSE3
+    ld hl,PULSE_3_ATTRS
+    call SET_ATTR_BYTES
     ret
 
 HIDE_PULSE4
+    cp 0
     ret
 
 SHOW_PULSE1
-    call HIDE_PULSE2
-    call HIDE_PULSE3
+    call DEBUG1
+    ; TODO SHOW 1
     call HIDE_PULSE4
     ret
 
 SHOW_PULSE2
+    call DEBUG2
+
     call HIDE_PULSE1
-    call HIDE_PULSE3
-    call HIDE_PULSE4
+    ; TODO SHOW 2
     ret
 
 SHOW_PULSE3
-    call HIDE_PULSE1
+    call DEBUG3
+
     call HIDE_PULSE2
-    call HIDE_PULSE4
+    ; TODO SHOW 3
     ret
 
 SHOW_PULSE4
-    call HIDE_PULSE1
-    call HIDE_PULSE2
+    call DEBUG4
+
     call HIDE_PULSE3
+    ; TODO SHOW 4
     ret
 
 FRAME_WAIT
@@ -198,20 +220,38 @@ UNDISPLAY_SPRITE
 
 ;; TODO attributes to black for old pulses
 TUNNEL_DRAW
-    ld a,128                    ; x centre
+    ld a,127                    ; x centre
     ld (PULSE_X),a
-    ld a,96                     ; y centre
+    ld a,95                   ; y centre
     ld (PULSE_Y),a
-    ld a,16
+    ld a,6
     ld (PULSE_RADIUS),a
     call CIRCLE                 ; circle at x,y with radius
-    ld a,32
+    ld a,14
     ld (PULSE_RADIUS),a
     call CIRCLE                 ; circle at x,y with radius
-    ld a,48
+    ld a,23
     ld (PULSE_RADIUS),a
     call CIRCLE                 ; circle at x,y with radius
-    ld a,64
+    ld a,39
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
+    ld a,47
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
+    ld a,55
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
+    ld a,63
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
+    ld a,71
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
+    ld a,79
+    ld (PULSE_RADIUS),a
+    call CIRCLE                 ; circle at x,y with radius
+    ld a,87
     ld (PULSE_RADIUS),a
     call CIRCLE                 ; circle at x,y with radius
     ret
@@ -249,8 +289,21 @@ DRAW_BACKGROUND_CHAR
     ret
 
 PULSE_1_ATTRS
-    defb 12,15,68,11,14,68,10,13,68,09,12,68,08,11,68,0
+    defb 11,15,59,11,16,59,12,15,59,12,16,59,255
 
+PULSE_2_ATTRS
+    defb 10,14,59,10,15,59,10,16,59,10,17,59
+    defb 11,14,59,11,17,59
+    defb 12,14,59,12,17,59
+    defb 13,14,59,13,15,59,13,16,59,13,17,59,255
+
+PULSE_3_ATTRS
+    defb 09,13,59,09,14,59,09,15,59,09,16,59,09,17,59,09,18,59
+    defb 10,13,59,10,18,59
+    defb 11,13,59,11,18,59
+    defb 12,13,59,12,18,59
+    defb 13,13,59,13,18,59
+    defb 14,13,59,14,14,59,14,15,59,14,16,59,14,17,59,14,18,59,255
 
 ;;
 ;; variables
@@ -258,7 +311,7 @@ PULSE_1_ATTRS
 
 MAX_POS         defb 15          ; 0, 1, 2, 3
 POS             defb 0           ; index into circle pos for sprite
-DISPX           defb 0           ; tmp for SPRITE routine
+DISPX           defw 0           ; tmp for SPRITE routine
 TMP0            defw 0           ; tmp for SPRITE routine
 SPRTMP          defw 0           ; tmp for SPRITE routine
 PULSE1_HIDDEN   defb 1           ; growing circle in tunnel
@@ -280,6 +333,7 @@ INCLUDE defs.asm
 INCLUDE circle.asm
 INCLUDE sprite.asm
 INCLUDE screen.asm
+INCLUDE debug.asm
 
 ;; $028e.  5  KEY_SCAN   {001} the keyboard scanning subroutine
 ;; On returning from $028e KEY_SCAN the DE register and the Zero flag indicate
