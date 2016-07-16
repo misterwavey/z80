@@ -35,7 +35,7 @@ ATTRS_START equ $5800
 
     ld a,0                      ; 0 is the code for black.
     out (254),a                 ; set border colour
-    ld bc,704                   ; prepare to write attrs for 32 chars x 22 rows
+    ld bc,768                   ; prepare to write attrs for 32 chars x 22 rows
     ld de,ATTRS_START           ; start of attrs displayfile
     push af                     ; protect a
 FILL_BLACK
@@ -124,7 +124,8 @@ DRAW_NO_BIT0
     pop bc
     dec c                       ; done all byte rows for character?
     jp nz,DRAW_CHAR_ROW
-
+spin
+    jr spin
     ret
 
 COMP_TEXT
