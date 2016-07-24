@@ -23,7 +23,7 @@ BRIGHT_WHITE_INK_ON_BLACK equ 127
 
     ;; set border
 
-    ld   a,7                    ; black
+    ld   a,0                    ; black colour
     out  ($fe),a                ; permanent border
 
     ;; clear all attrs to black
@@ -57,14 +57,14 @@ LOOP_OVER_CHARS_IN_TEXT
     ld   de,ROM_CHARS_START
     add  hl,de                  ; ROM char = 3C00 + 8 * character code
     ex   de,hl                  ; de := ROM char position
-    ld   (ROM_CHAR_POSITION),de
+    push de
 
     ld   a,1
     ld   (ROTATESIZE),a         ; setup rotate counter
 
 LOOP_OVER_ROTATESIZE
     ld   b,8                    ; rom char byte count
-    ld   hl,ATTRS_START-1     ; last attrs col top row
+    ld   hl,ATTRS_START-1       ; allow for loop to add 32d each time when displaying
     xor  a                      ; clear carry for later rotations
 
 LOOP_OVER_BYTES_IN_ROM_CHAR
@@ -104,30 +104,26 @@ DRAW_ROW_CELL
 
     halt
     ;; scroll attrs
-    push de
-    push hl
     ld   de,ATTRS_START
     ld   hl,ATTRS_START+1
     ld   bc,8*32                ; top 8 ATTR rows
     ldir                        ; shift attrs left
-    pop  hl
-    pop  de
 
     ld   a,(ROTATESIZE)         ; bump rotatesize
     inc  a
     ld   (ROTATESIZE),a
-    ld   de,(ROM_CHAR_POSITION)
+    pop  de
+    push de
     cp   9                     ; unless we've done all 8
     jp   nz,LOOP_OVER_ROTATESIZE
 
+    pop  de
     pop  hl
     inc  hl                     ; next text char
     jp   LOOP_OVER_CHARS_IN_TEXT
 
 ROTATESIZE
     defb 0
-ROM_CHAR_POSITION
-    defb 0,0
 COMP_TEXT
     defb "Welcome to the Z80 Assembly Programming "
     defb "On The ZX Spectrum Compo #7 ScrollText.....",0
