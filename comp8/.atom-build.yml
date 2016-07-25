@@ -1,0 +1,6 @@
+cmd: ./go.sh
+errorMatch: "ERROR on line (?<line>\\d+) of file (?<file>[\\/0-9a-zA-Z\\._]+)"
+
+#assembler problems
+#ERROR on line 66 of file comp7.asm
+#ERROR: Value expected but 'HL'found
