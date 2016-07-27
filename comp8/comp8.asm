@@ -12,48 +12,119 @@ INIT
 CLEAR_ATTR
     ld   (hl),0                 ; black is black ink 1x0 + black paper 8x0 = 0
     inc  hl
-    dec  bc
-    ld   a,b                    ; 16 bit decrement ...
-    or   c                      ; ... test. z set when b & c both 0
+    dec  bc                     ; 16 bit decrement ...
+    ld   a,b                    ; check if b
+    or   c                      ; and c both zero
     jr   nz,CLEAR_ATTR          ; loop to set all attrs to 0
 
 DRAW_SCREEN
     ld   hl,ATTRS_START
     ld   de,MAP
-SCREEN_LOOP
-    ld   a,(de)
-    cp   255
-    jp   z,DONE_SCREEN
-    ld   c,a
-    ld   b,0
-    add  hl,bc
+
+LOOP_OVER_BYTES_IN_MAP
+    ld   b,32                   ; bytes to process for whole map
+    ld   a,8
+    ld   (ROTATESIZE),a
+    ld   a,(de)                 ; take byte from map
+    push af
+
+LOOP_OVER_ROTATESIZE
+    pop  af
+    rl   a                      ; rotate it
+    push af
+    jp   nc,SET_BLANK_CELL
     ld   a,BRIGHT_WHITE_INK_ON_BLACK
+    jp   DRAW_CELL
+
+SET_BLANK_CELL
+    ld   a,0
+DRAW_CELL
     ld   (hl),a
+    inc  hl
+    ld   a,(ROTATESIZE)
+    dec  a
+    ld   (ROTATESIZE),a
+    cp   0
+    jp   nz,LOOP_OVER_ROTATESIZE
+
+    pop  af                     ; balance stack
+    ld   a,(FLIPFLOP)
+    cp   0
+    jp   z,NO_ATTR_JUMP
+
+    ;; ATTR_JUMP
+    push de
+    ld   e,16
+    ld   d,0
+    add  hl,de                  ; next attr row
+    pop  de
+    ld   a,0
+    ld   (FLIPFLOP),a
+    jp   AFTER_ATTR_JUMP
+
+NO_ATTR_JUMP
+    ld   a,1
+    ld   (FLIPFLOP),a
+
+AFTER_ATTR_JUMP
     inc  de
-    jp   SCREEN_LOOP
+    dec  b
+    ld   a,b
+    cp   0
+    jr   nz,LOOP_OVER_BYTES_IN_MAP
 
 DONE_SCREEN
     ret
 
-MAP
+; loop over bytes in map 0..31
+;   loop over rotatesize 1..8
+;     rotate byte
+;     draw bit
+;     inc attr
+;   if odd add 16 to attr
 
-    defb  0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-    defb 17, 1,                                       14
-    defb 17,                                          15
-    defb 17,                                          15
-    defb 17,                                          15
-    defb 17,                   7,                      8
-    defb 17,                   7,                      8
-    defb 17,1,             4,1,1,1,1,               5, 1
-    defb 17,                   7,                      8
-    defb 17,                   7,                      8
-    defb 17,                                          15
-    defb 17,                                          15
-    defb 17,                                          15
-    defb 17,                                    13, 1, 1
-    defb 17,                                    13, 1, 1
-    defb 17, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-    defb 255
+ROTATESIZE
+    defb 0
+
+FLIPFLOP
+    defb 0
+
+MAP
+    defb 11111111b,11111111b
+    defb 11000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000001b,00000001b
+    defb 10000001b,00000001b
+    defb 11000111b,11000001b
+
+    defb 10000001b,00000001b
+    defb 10000001b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000111b
+    defb 10000000b,00000111b
+    defb 11111111b,11111111b
+
+    ; defb  0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    ; defb 17, 1,                                       14
+    ; defb 17,                                          15
+    ; defb 17,                                          15
+    ; defb 17,                                          15
+    ; defb 17,                   7,                      8
+    ; defb 17,                   7,                      8
+    ; defb 17,1,             4,1,1,1,1,               5, 1
+    ; defb 17,                   7,                      8
+    ; defb 17,                   7,                      8
+    ; defb 17,                                          15
+    ; defb 17,                                          15
+    ; defb 17,                                          15
+    ; defb 17,                                    13, 1, 1
+    ; defb 17,                                    13, 1, 1
+    ; defb 17, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    ; defb 255
 
     ; defb 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10,  11,  12,  13,  14,  15
     ; defb 32, 33,                                                          47
@@ -70,7 +141,7 @@ MAP
     ; defb 384,                                                            399
     ; defb 416,                                                    429,430,431
     ; defb 448,                                                    461,462,463
-    ; defb 480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496                                                            255
+    ; defb 480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496
 
 ATTRS_START equ $5800
 BRIGHT_WHITE_INK_ON_BLACK equ 127
