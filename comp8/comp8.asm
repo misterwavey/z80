@@ -20,9 +20,9 @@ CLEAR_ATTR
 DRAW_SCREEN
     ld   hl,ATTRS_START
     ld   de,MAP
+    ld   b,32                   ; bytes to process for whole map
 
 LOOP_OVER_BYTES_IN_MAP
-    ld   b,32                   ; bytes to process for whole map
     ld   a,8
     ld   (ROTATESIZE),a
     ld   a,(de)                 ; take byte from map
@@ -95,12 +95,12 @@ MAP
     defb 10000000b,00000001b
     defb 10000000b,00000001b
     defb 10000000b,00000001b
-    defb 10000001b,00000001b
-    defb 10000001b,00000001b
-    defb 11000111b,11000001b
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
+    defb 11000011b,11100011b
 
-    defb 10000001b,00000001b
-    defb 10000001b,00000001b
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
     defb 10000000b,00000001b
     defb 10000000b,00000001b
     defb 10000000b,00000001b
