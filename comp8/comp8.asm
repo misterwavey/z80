@@ -19,12 +19,12 @@ CLEAR_ATTR
 
 DRAW_SCREEN
     ld   hl,ATTRS_START
-    ld   de,MAP
+    ld   de,MAP                 ; start of screen map bytes
     ld   b,32                   ; bytes to process for whole map
 
 LOOP_OVER_BYTES_IN_MAP
-    ld   a,8
-    ld   (ROTATESIZE),a
+    ld   a,8                    ; bits to process per byte
+    ld   (ROTATESIZE),a         ; store in memory
     ld   a,(de)                 ; take byte from map
     push af
 
@@ -73,7 +73,64 @@ AFTER_ATTR_JUMP
     cp   0
     jr   nz,LOOP_OVER_BYTES_IN_MAP
 
-DONE_SCREEN
+GAME_LOOP
+
+    ;; check input
+    ld    a, $1a
+    call  KTEST
+    call  nc,ROTATELEFT
+    call CLEAR
+    ld    a, $22
+    call  KTEST
+    call  nc,ROTATERIGHT
+    call CLEAR
+
+    ;; move ball
+
+    ;; check for goal
+
+    JR GAME_LOOP
+
+ROTATELEFT
+    ld   a,22             ; AT code.
+    rst  16
+    ld   a,1              ; player vertical coord.
+    rst  16              ; set vertical position of player.
+    ld   a,1                ; player's horizontal position.
+    rst  16              ; set the horizontal coord.
+    ld   a,69             ; cyan ink (5) on black paper (0),
+                        ; bright (64).
+    ld   (23695),a        ; set our temporary screen colours.
+    ld   a,'o'            ; ASCII code for User Defined Graphic 'A'.
+    rst  16              ; draw player.
+    ret
+
+ROTATERIGHT
+    ld   a,22             ; AT code.
+    rst  16
+    ld   a,1              ; player vertical coord.
+    rst  16              ; set vertical position of player.
+    ld   a,1                ; player's horizontal position.
+    rst  16              ; set the horizontal coord.
+    ld   a,69             ; cyan ink (5) on black paper (0),
+                        ; bright (64).
+    ld   (23695),a        ; set our temporary screen colours.
+    ld   a,'p'            ; ASCII code for User Defined Graphic 'A'.
+    rst  16              ; draw player.
+    ret
+
+CLEAR
+    ld   a,22             ; AT code.
+    rst  16
+    ld   a,1              ; player vertical coord.
+    rst  16              ; set vertical position of player.
+    ld   a,1                ; player's horizontal position.
+    rst  16              ; set the horizontal coord.
+    ld   a,69             ; cyan ink (5) on black paper (0),
+                        ; bright (64).
+    ld  (23695),a        ; set our temporary screen colours.
+    ld  a,' '            ; ASCII code for User Defined Graphic 'A'.
+    rst 16              ; draw player.
     ret
 
 ; loop over bytes in map 0..31
@@ -82,6 +139,45 @@ DONE_SCREEN
 ;     draw bit
 ;     inc attr
 ;   if odd add 16 to attr
+
+; Credit for this must go to Stephen Jones, a programmer who used to
+; write excellent articles for the Spectrum Discovery Club many years ago.
+;
+; To use his routine, load the accumulator with the number of the key
+; you wish to test, call ktest, then check the carry flag.  If it's set
+; the key is not being pressed, if there's no carry then the key is
+; being pressed.  If that's too confusing and seems like the wrong way
+; round, put a ccf instruction just before the ret.
+
+; Mr. Jones' keyboard test routine.
+
+KTEST
+    ld   c,a                    ; key to test in c.
+    and  7                      ; mask bits d0-d2 for row.
+    inc  a                      ; in range 1-8.
+    ld   b,a                    ; place in b.
+    srl  c                      ; divide c by 8,
+    srl  c                      ; to find position within row.
+    srl  c
+    ld   a,5                    ; only 5 keys per row.
+    sub  c                      ; subtract position.
+    ld   c,a                    ; put in c.
+    ld   a,254                  ; high byte of port to read.
+KTEST0
+    rrca                        ; rotate into position.
+    djnz KTEST0                 ; repeat until we've found relevant row.
+    in a,(254)                  ; read port (a=high, 254=low).
+KTEST1
+    rra                         ; rotate bit out of result.
+    dec c                       ; loop counter.
+    jp nz,KTEST1                ; repeat until bit for position in carry.
+    ret
+
+BALLX
+    defb 0
+
+BALLY
+    defb 0
 
 ROTATESIZE
     defb 0
