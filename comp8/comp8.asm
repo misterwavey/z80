@@ -17,17 +17,29 @@ CLEAR_ATTR
     or   c                      ; and c both zero
     jr   nz, CLEAR_ATTR          ; loop to set all attrs to 0
 
+; loop over rows in map 1..16
+;   loop over bytes in row 1..2
+;     loop over rotatesize 1..8
+;       rotate byte
+;       draw bit
+;       inc attr
+;   inc attr row
+
 DRAW_SCREEN
     ld   hl, ATTRS_START
     ld   de, MAP                ; start of screen map bytes
-    ld   b, 32                  ; bytes to process for whole map
+    ld   b, 16                  ; rows of bytes in map
 
-LOOP_OVER_BYTES_IN_MAP
+LOOP_OVER_ROWS_IN_MAP
+    push bc
+    push hl
+    ld   b, 2                   ; 2 bytes per row 
+
+LOOP_OVER_BYTES_IN_ROW
     push bc
     ld   b, 8                   ; bits to process per byte
     ld   a, (de)                ; take byte from map
-    ld   c, a                   ; use c to rotate byte
-    push bc
+    ld   c, a                   ; we'll use c to rotate byte
 
 LOOP_OVER_ROTATESIZE
     rl   c                      ; rotate it
@@ -42,29 +54,24 @@ DRAW_CELL
     inc  hl                     ; next attr
     djnz LOOP_OVER_ROTATESIZE   ; dec rotate count and rotate until done
 
+    inc  de                     ; next byte in map
     pop  bc
-    ld   a, (FLIPFLOP)
-    cp   0
-    jp   z, NO_ATTR_JUMP
+    djnz LOOP_OVER_BYTES_IN_ROW
 
-    ;; ATTR_JUMP
-    push de
-    ld   e, 16
-    ld   d, 0
-    add  hl, de                  ; next attr row
-    pop  de
-    ld   a, 0
-    ld   (FLIPFLOP), a
-    jp   AFTER_ATTR_JUMP
-
-NO_ATTR_JUMP
-    ld   a, 1
-    ld   (FLIPFLOP), a
-
-AFTER_ATTR_JUMP
-    inc  de
+    pop  hl
+    ld   bc, 32                 ; next attr row
+    add  hl, bc
     pop  bc
-    djnz LOOP_OVER_BYTES_IN_MAP
+    djnz LOOP_OVER_ROWS_IN_MAP
+
+
+
+
+
+
+
+
+
 
 GAME_LOOP
     ;; check input
@@ -127,12 +134,7 @@ CLEAR
     rst 16              ; draw player.
     ret
 
-; loop over bytes in map 0..31
-;   loop over rotatesize 1..8
-;     rotate byte
-;     draw bit
-;     inc attr
-;   if odd add 16 to attr
+
 
 ; Credit for this must go to Stephen Jones, a programmer who used to
 ; write excellent articles for the Spectrum Discovery Club many years ago.
