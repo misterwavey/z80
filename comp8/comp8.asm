@@ -2,134 +2,128 @@ org 24000
 
 INIT
     ;; set border
-    ld   a,0                    ; black colour
-    out  ($fe),a                ; permanent border
+    ld   a, 0                    ; black colour
+    out  ($fe), a                ; permanent border
 
     ;; clear all attrs to black
 
-    ld   hl,ATTRS_START         ; $5800
-    ld   bc,32*24               ; 32 columns x 24 rows
+    ld   hl, ATTRS_START         ; $5800
+    ld   bc, 32*24               ; 32 columns x 24 rows
 CLEAR_ATTR
-    ld   (hl),0                 ; black is black ink 1x0 + black paper 8x0 = 0
+    ld   (hl), 0                 ; black is black ink 1x0 + black paper 8x0 = 0
     inc  hl
     dec  bc                     ; 16 bit decrement ...
-    ld   a,b                    ; check if b
+    ld   a, b                    ; check if b
     or   c                      ; and c both zero
-    jr   nz,CLEAR_ATTR          ; loop to set all attrs to 0
+    jr   nz, CLEAR_ATTR          ; loop to set all attrs to 0
 
 DRAW_SCREEN
-    ld   hl,ATTRS_START
-    ld   de,MAP                 ; start of screen map bytes
-    ld   b,32                   ; bytes to process for whole map
+    ld   hl, ATTRS_START
+    ld   de, MAP                ; start of screen map bytes
+    ld   b, 32                  ; bytes to process for whole map
 
 LOOP_OVER_BYTES_IN_MAP
-    ld   a,8                    ; bits to process per byte
-    ld   (ROTATESIZE),a         ; store in memory
-    ld   a,(de)                 ; take byte from map
-    push af
+    push bc
+    ld   b, 8                   ; bits to process per byte
+    ld   a, (de)                ; take byte from map
+    ld   c, a                   ; use c to rotate byte
+    push bc
 
 LOOP_OVER_ROTATESIZE
-    pop  af
-    rl   a                      ; rotate it
-    push af
-    jp   nc,SET_BLANK_CELL
-    ld   a,BRIGHT_WHITE_INK_ON_BLACK
+    rl   c                      ; rotate it
+    jp   nc, SET_BLANK_CELL     ; got a carry?
+    ld   a, BRIGHT_WHITE_INK_ON_BLACK ; yep
     jp   DRAW_CELL
 
 SET_BLANK_CELL
-    ld   a,0
+    ld   a, 0                   ; didn't have carry, draw black cell
 DRAW_CELL
-    ld   (hl),a
-    inc  hl
-    ld   a,(ROTATESIZE)
-    dec  a
-    ld   (ROTATESIZE),a
-    cp   0
-    jp   nz,LOOP_OVER_ROTATESIZE
+    ld   (hl), a                ; colour attr using A
+    inc  hl                     ; next attr
+    djnz LOOP_OVER_ROTATESIZE   ; dec rotate count and rotate until done
 
-    pop  af                     ; balance stack
-    ld   a,(FLIPFLOP)
+    pop  bc
+    ld   a, (FLIPFLOP)
     cp   0
-    jp   z,NO_ATTR_JUMP
+    jp   z, NO_ATTR_JUMP
 
     ;; ATTR_JUMP
     push de
-    ld   e,16
-    ld   d,0
-    add  hl,de                  ; next attr row
+    ld   e, 16
+    ld   d, 0
+    add  hl, de                  ; next attr row
     pop  de
-    ld   a,0
-    ld   (FLIPFLOP),a
+    ld   a, 0
+    ld   (FLIPFLOP), a
     jp   AFTER_ATTR_JUMP
 
 NO_ATTR_JUMP
-    ld   a,1
-    ld   (FLIPFLOP),a
+    ld   a, 1
+    ld   (FLIPFLOP), a
 
 AFTER_ATTR_JUMP
     inc  de
-    dec  b
-    ld   a,b
-    cp   0
-    jr   nz,LOOP_OVER_BYTES_IN_MAP
+    pop  bc
+    djnz LOOP_OVER_BYTES_IN_MAP
 
 GAME_LOOP
-
     ;; check input
     ld    a, $1a
     call  KTEST
-    call  nc,ROTATELEFT
+    call  nc, ROTATELEFT
     call CLEAR
+
     ld    a, $22
     call  KTEST
-    call  nc,ROTATERIGHT
+    call  nc, ROTATERIGHT
     call CLEAR
 
     ;; move ball
 
     ;; check for goal
 
-    JR GAME_LOOP
+        ;JR GAME_LOOP
+    ret
 
 ROTATELEFT
-    ld   a,22             ; AT code.
-    rst  16
-    ld   a,1              ; player vertical coord.
-    rst  16              ; set vertical position of player.
-    ld   a,1                ; player's horizontal position.
-    rst  16              ; set the horizontal coord.
-    ld   a,69             ; cyan ink (5) on black paper (0),
-                        ; bright (64).
-    ld   (23695),a        ; set our temporary screen colours.
-    ld   a,'o'            ; ASCII code for User Defined Graphic 'A'.
-    rst  16              ; draw player.
+    ; ld   a,22             ; AT code.
+    ; rst  16
+    ; ld   a,1              ; player vertical coord.
+    ; rst  16              ; set vertical position of player.
+    ; ld   a,1                ; player's horizontal position.
+    ; rst  16              ; set the horizontal coord.
+    ; ld   a,69             ; cyan ink (5) on black paper (0),
+    ;                     ; bright (64).
+    ; ld   (23695),a        ; set our temporary screen colours.
+    ; ld   a,'o'            ; ASCII code for User Defined Graphic 'A'.
+    ; rst  16              ; draw player.
     ret
 
 ROTATERIGHT
-    ld   a,22             ; AT code.
-    rst  16
-    ld   a,1              ; player vertical coord.
-    rst  16              ; set vertical position of player.
-    ld   a,1                ; player's horizontal position.
-    rst  16              ; set the horizontal coord.
-    ld   a,69             ; cyan ink (5) on black paper (0),
-                        ; bright (64).
-    ld   (23695),a        ; set our temporary screen colours.
-    ld   a,'p'            ; ASCII code for User Defined Graphic 'A'.
-    rst  16              ; draw player.
+    ; ld   a,22             ; AT code.
+    ; rst  16
+    ; ld   a,1              ; player vertical coord.
+    ; rst  16              ; set vertical position of player.
+    ; ld   a,1                ; player's horizontal position.
+    ; rst  16              ; set the horizontal coord.
+    ; ld   a,69             ; cyan ink (5) on black paper (0),
+    ;                     ; bright (64).
+    ; ld   (23695),a        ; set our temporary screen colours.
+    ; ld   a,'p'            ; ASCII code for User Defined Graphic 'A'.
+    ; rst  16              ; draw player.
     ret
 
 CLEAR
-    ld   a,22             ; AT code.
+    ld   a, 22             ; AT code.
     rst  16
-    ld   a,1              ; player vertical coord.
+    ld   a, 1              ; player vertical coord.
     rst  16              ; set vertical position of player.
-    ld   a,1                ; player's horizontal position.
+    ld   a, 1                ; player's horizontal position.
     rst  16              ; set the horizontal coord.
-    ld   a,69             ; cyan ink (5) on black paper (0),
+    ld   a, 69             ; cyan ink (5) on black paper (0),
                         ; bright (64).
-    ld  (23695),a        ; set our temporary screen colours.
-    ld  a,' '            ; ASCII code for User Defined Graphic 'A'.
+    ld  (23695), a        ; set our temporary screen colours.
+    ld  a, ' '            ; ASCII code for User Defined Graphic 'A'.
     rst 16              ; draw player.
     ret
 
@@ -148,6 +142,19 @@ CLEAR
 ; the key is not being pressed, if there's no carry then the key is
 ; being pressed.  If that's too confusing and seems like the wrong way
 ; round, put a ccf instruction just before the ret.
+
+;; KEY_SCAN key codes: hex, decimal, binary
+;; ? hh dd bbbbbbbb   ? hh dd bbbbbbbb   ? hh dd bbbbbbbb   ? hh dd bbbbbbbb
+;; 1 24 36 00100011   Q 25 37 00100101   A 26 38 00100110  CS 27 39 00100111
+;; 2 1c 28 00011100   W 1d 29 00011101   S 1e 30 00011110   Z 1f 31 00011111
+;; 3 14 20 00010100   E 15 21 00010101   D 16 22 00010110   X 17 23 00010111
+;; 4 0c 12 00001100   R 0d 13 00001101   F 0e 14 00001110   C 0f 15 00001111
+;; 5 04  4 00000100   T 05  5 00000101   G 06  6 00000110   V 07  7 00000111
+;; 6 03  3 00000011   Y 02  2 00000010   H 01  1 00000001   B 00  0 00000000
+;; 7 0b 11 00001011   U 0a 10 00001010   J 09  9 00001001   N 08  8 00001000
+;; 8 13 19 00010011   I 12 18 00010010   K 11 17 00010001   M 10 16 00010000
+;; 9 1b 27 00011011   O 1a 26 00011010   L 19 25 00011001  SS 18 24 00011000
+;; 0 23 35 00100011   P 22 34 00100010  EN 21 33 00100001  SP 20 32 00100000
 
 ; Mr. Jones' keyboard test routine.
 
@@ -177,9 +184,6 @@ BALLX
     defb 0
 
 BALLY
-    defb 0
-
-ROTATESIZE
     defb 0
 
 FLIPFLOP
