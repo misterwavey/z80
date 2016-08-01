@@ -19,7 +19,8 @@ CLEAR_ATTR
     or   c                      ; and c both zero
     jr   nz, CLEAR_ATTR         ; loop to set all attrs to 0
 
-    call INIT_MAP               ; populate MAP_COPY with template
+    ld   a, (ROTATION_COUNT)
+    call SETUP_MAP               ; populate MAP_COPY with template
     call DRAW_SCREEN            ; render MAP_COPY to screen
 
     ;;
@@ -38,10 +39,12 @@ GAME_LOOP
     ;; move ball
 
     ;; check for goal
-
+    halt
     JR GAME_LOOP
 
+    ;;
     ;; DRAW SCREEN routine
+    ;;
 
     ; loop over rows in map 1..16
     ;   loop over bytes in row 1..2
@@ -94,23 +97,67 @@ DRAW_CELL
 
     ;;
     ;; INIT_MAP routine
+    ;; accumulator needs to hold 0,1,2,3 for 0,90,180,270 version of map
     ;;
-INIT_MAP
-    ld  hl, MAP_TEMPLATE
+SETUP_MAP
+    cp  3
+    jr  z, HANDLE_270
+    cp  2
+    jr  z, HANDLE_180
+    cp  1
+    jr  z, HANDLE_90
+    ld  hl, MAP_0
+    jr  POPULATE_MAP
+HANDLE_270
+    ld  hl, MAP_270
+    jr  POPULATE_MAP
+HANDLE_180
+    ld  hl, MAP_180
+    jr  POPULATE_MAP
+HANDLE_90
+    ld  hl, MAP_90
+    jr  POPULATE_MAP
+    ld  hl, MAP_0
+POPULATE_MAP
     ld  de, MAP
     ld  bc, 32
     ldir
+    ret
 
     ;;
     ;; rotate map_template into map area
     ;;
 ROTATE_RIGHT
-    call DEBUG_P
+    ; call DEBUG_P
+
+; loop over rows in map 1..16
+;   loop over bytes in row 1..2
+;     loop over rotatesize 1..8
+;       rotate MAP_TEMPLATE byte bit 7 into carry
+;       rotate from carry into MAP byte bit 0
+;       inc attr
+;   inc attr row
+
+    ld   a, (ROTATION_COUNT)
+    inc  a
+    cp   4
+    jr   nz, DONE_SETUP_DEGREES_R
+    ld   a, 0                   ; was 4, loop over to 0
+DONE_SETUP_DEGREES_R
+    ld   (ROTATION_COUNT), a
+    call SETUP_MAP
     call DRAW_SCREEN
     ret
 
 ROTATE_LEFT
-    call DEBUG_O
+    ld   a, (ROTATION_COUNT)
+    dec  a
+    cp   -1
+    jr   nz, DONE_SETUP_DEGREES_L
+    ld   a, 3                   ; was 0, loop over to 3
+DONE_SETUP_DEGREES_L
+    ld   (ROTATION_COUNT), a
+    call SETUP_MAP
     call DRAW_SCREEN
     ret
 
@@ -160,45 +207,14 @@ KTEST1
 ;; 9 1b 27 00011011   O 1a 26 00011010   L 19 25 00011001  SS 18 24 00011000
 ;; 0 23 35 00100011   P 22 34 00100010  EN 21 33 00100001  SP 20 32 00100000
 
-    ;;
-    ;; DEBUG CODE USES ROM PRINT POSITION - DELETE !!
-    ;;
-
-DEBUG_O
-    ld   a, 22                  ; AT code
-    rst  16
-    ld   a, 2                   ; y pos
-    rst  16
-    ld   a, 1                   ; x pos
-    rst  16
-    ld   a, 69                  ; cyan ink (5) on black paper (0), bright (64)
-    ld   (23695), a             ; $5C8f temporary screen colours SysVar
-    ld   a, 'o'
-    rst  16
-    ret
-
-DEBUG_P
-    ld   a, 22
-    rst  16
-    ld   a, 2
-    rst  16
-    ld   a, 1
-    rst  16
-    ld   a, 69
-    ld   (23695), a
-    ld   a, 'p'
-    rst  16
-    ret
-
-    ;;
-    ;; END DEBUG - DELETE !!
-    ;;
-
 BALLYX
     defb 0,0
 
+ROTATION_COUNT
+    defb 0                      ; 0=0 degrees, 1=90 degrees, 2=180, 3=270
+
     ;; INITIAL TEMPLATE OF THE SCREEN MAP
-MAP_TEMPLATE
+MAP_0
     defb 11111111b,11111111b
     defb 11000000b,00000001b
     defb 10000000b,00000001b
@@ -217,13 +233,81 @@ MAP_TEMPLATE
     defb 10000000b,00000111b
     defb 11111111b,11111111b
 
+MAP_90
+    defb 11111111b,11111111b
+    defb 10000000b,10000011b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
+    defb 10000011b,11100001b
+
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 11100000b,00000001b
+    defb 11100000b,10000001b
+    defb 11111111b,11111111b
+
+MAP_180
+    defb 11111111b,11111111b
+    defb 11100000b,00000001b
+    defb 11100000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
+    defb 11000011b,11100011b
+
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000011b
+    defb 11111111b,11111111b
+
+MAP_270
+    defb 11111111b,11111111b
+    defb 10000000b,10000111b
+    defb 10000000b,00000111b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
+    defb 10000011b,11100001b
+
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 10000000b,00000001b
+    defb 11000000b,10000001b
+    defb 11111111b,11111111b
     ;; AREA THAT THE TEMPLATE IS ROTATED INTO
 MAP
-    defb 0,0,0,0,0,0,0,0
-    defb 0,0,0,0,0,0,0,0
-    defb 0,0,0,0,0,0,0,0
-    defb 0,0,0,0,0,0,0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
 
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
+    defb 0,0
 
     ; defb  0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
     ; defb 17, 1,                                       14
@@ -262,8 +346,6 @@ MAP
 
 ATTRS_START equ $5800
 BRIGHT_WHITE_INK_ON_BLACK equ 127
-
-end 24000
 
 ;  1 2 3 4 5 6 7 8 9 0 A B C D E F
 ;1 x x x x x x x x x x x x x x x x
@@ -310,3 +392,7 @@ end 24000
 ;22 5aa0 .. 5abf
 ;23 5ac0 .. 5adf
 ;24 5ae0 .. 5aff
+
+sizeofALL: equ $-INIT
+
+    end 24000
