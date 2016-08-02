@@ -124,6 +124,7 @@ DRAW_ROW_CELL
 
 ROTATESIZE
     defb 0
+    
 COMP_TEXT
     defb "Welcome to the Z80 Assembly Programming "
     defb "On The ZX Spectrum Compo #7 ScrollText.....",0

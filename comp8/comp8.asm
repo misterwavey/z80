@@ -19,27 +19,50 @@ CLEAR_ATTR
     or   c                      ; and c both zero
     jr   nz, CLEAR_ATTR         ; loop to set all attrs to 0
 
-    ld   a, (ROTATION_COUNT)
-    call SETUP_MAP               ; populate MAP_COPY with template
-    call DRAW_SCREEN            ; render MAP_COPY to screen
+    call SETUP_MAP_AND_DRAW
 
     ;;
     ;; main loop - no exit
     ;;
 GAME_LOOP
-    ;; check input
-    ld    a, $1a                 ; 'o'
-    call  KTEST
-    call  nc, ROTATE_LEFT        ; pressed?
+;     ld   a, (ALLOW_INPUT_VAR)
+;     cp   1
+;     jr   z, CHECK_INPUT
+;
+    ld   hl, LAST_FRAME_TIME    ; time of last check
+    ld   a, (FRAMES)            ; current timer setting.
+    sub  (hl)
+    cp   10                     ; 1/2 second elapsed?
+    jr   nc, CHECK_INPUT        ; window exceeded?
+    ; jr   nc, ALLOW_INPUT        ; window exceeded?
+    jr   SKIP_INPUT
+;
+; ALLOW_INPUT
+;     ld   a, 1
+;     ld   (ALLOW_INPUT_VAR), a
 
-    ld    a, $22                 ; 'p'
-    call  KTEST
-    call  nc, ROTATE_RIGHT       ; pressed?
+CHECK_INPUT
+    ld   a, $1a                 ; 'o'
+    call KTEST
+    call nc, ROTATE_LEFT        ; pressed?
+
+    ld   a, $22                 ; 'p'
+    call KTEST
+    call nc, ROTATE_RIGHT       ; pressed?
+
+    ; ld   a, 0
+    ; ld   (ALLOW_INPUT_VAR), a   ; disallow immediate input
+    ;
+    ld   a, (FRAMES)            ; current timer setting.
+    ld   (LAST_FRAME_TIME), a   ; store current frames
+
+SKIP_INPUT
+    halt
 
     ;; move ball
 
     ;; check for goal
-    halt
+
     JR GAME_LOOP
 
     ;;
@@ -106,7 +129,7 @@ SETUP_MAP
     jr  z, HANDLE_180
     cp  1
     jr  z, HANDLE_90
-    ld  hl, MAP_0
+    ld  hl, MAP_0               ; handle 0
     jr  POPULATE_MAP
 HANDLE_270
     ld  hl, MAP_270
@@ -117,7 +140,6 @@ HANDLE_180
 HANDLE_90
     ld  hl, MAP_90
     jr  POPULATE_MAP
-    ld  hl, MAP_0
 POPULATE_MAP
     ld  de, MAP
     ld  bc, 32
@@ -144,9 +166,7 @@ ROTATE_RIGHT
     jr   nz, DONE_SETUP_DEGREES_R
     ld   a, 0                   ; was 4, loop over to 0
 DONE_SETUP_DEGREES_R
-    ld   (ROTATION_COUNT), a
-    call SETUP_MAP
-    call DRAW_SCREEN
+    call SETUP_MAP_AND_DRAW
     ret
 
 ROTATE_LEFT
@@ -156,6 +176,10 @@ ROTATE_LEFT
     jr   nz, DONE_SETUP_DEGREES_L
     ld   a, 3                   ; was 0, loop over to 3
 DONE_SETUP_DEGREES_L
+    call SETUP_MAP_AND_DRAW
+    ret
+
+SETUP_MAP_AND_DRAW
     ld   (ROTATION_COUNT), a
     call SETUP_MAP
     call DRAW_SCREEN
@@ -173,25 +197,25 @@ DONE_SETUP_DEGREES_L
 ; Mr. Jones' keyboard test routine.
 
 KTEST
-    ld   c,a                    ; key to test in c.
+    ld   c, a                   ; key to test in c.
     and  7                      ; mask bits d0-d2 for row.
     inc  a                      ; in range 1-8.
-    ld   b,a                    ; place in b.
+    ld   b, a                   ; place in b.
     srl  c                      ; divide c by 8,
     srl  c                      ; to find position within row.
     srl  c
-    ld   a,5                    ; only 5 keys per row.
+    ld   a, 5                   ; only 5 keys per row.
     sub  c                      ; subtract position.
-    ld   c,a                    ; put in c.
-    ld   a,$FE                  ; high byte of port to read.
+    ld   c, a                   ; put in c.
+    ld   a, $FE                 ; high byte of port to read.
 KTEST0
     rrca                        ; rotate into position.
     djnz KTEST0                 ; repeat until we've found relevant row.
-    in a,($FE)                  ; read port (a=high, 254=low).
+    in    a, ($FE)              ; read port (a=high, 254=low).
 KTEST1
     rra                         ; rotate bit out of result.
-    dec c                       ; loop counter.
-    jp nz,KTEST1                ; repeat until bit for position in carry.
+    dec   c                     ; loop counter.
+    jp    nz, KTEST1            ; repeat until bit for position in carry.
     ret
 
 ;; KEY_SCAN key codes: hex, decimal, binary
@@ -210,10 +234,17 @@ KTEST1
 BALLYX
     defb 0,0
 
+LAST_FRAME_TIME                 ; last frame counter value
+    defb 0
+
+ALLOW_INPUT_VAR
+    defb 1
+
 ROTATION_COUNT
     defb 0                      ; 0=0 degrees, 1=90 degrees, 2=180, 3=270
 
-    ;; INITIAL TEMPLATE OF THE SCREEN MAP
+    ;; rotated versions of the screen map for 0, 90, 180, 270 degrees
+
 MAP_0
     defb 11111111b,11111111b
     defb 11000000b,00000001b
@@ -289,7 +320,8 @@ MAP_270
     defb 10000000b,00000001b
     defb 11000000b,10000001b
     defb 11111111b,11111111b
-    ;; AREA THAT THE TEMPLATE IS ROTATED INTO
+
+    ;; AREA THAT EACH TEMPLATE IS COPIED INTO
 MAP
     defb 0,0
     defb 0,0
@@ -344,8 +376,10 @@ MAP
     ; defb 448,                                                    461,462,463
     ; defb 480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496
 
-ATTRS_START equ $5800
-BRIGHT_WHITE_INK_ON_BLACK equ 127
+ATTRS_START                 equ $5800
+BRIGHT_WHITE_INK_ON_BLACK   equ 127
+FRAMES                      equ $5C78       ; frame counter
+
 
 ;  1 2 3 4 5 6 7 8 9 0 A B C D E F
 ;1 x x x x x x x x x x x x x x x x
