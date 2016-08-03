@@ -25,21 +25,19 @@ CLEAR_ATTR
     ;; main loop - no exit
     ;;
 GAME_LOOP
-;     ld   a, (ALLOW_INPUT_VAR)
-;     cp   1
-;     jr   z, CHECK_INPUT
-;
     ld   hl, LAST_FRAME_TIME    ; time of last check
     ld   a, (FRAMES)            ; current timer setting.
     sub  (hl)
-    cp   10                     ; 1/2 second elapsed?
-    jr   nc, CHECK_INPUT        ; window exceeded?
-    ; jr   nc, ALLOW_INPUT        ; window exceeded?
+    cp   3                     ; 1/2 second elapsed?
+    jr   nc, ALLOW_INPUT        ; window exceeded?
+
+    ld   a, (INPUT_ALLOWED)
+    cp   0
+    jr   nz, CHECK_INPUT
     jr   SKIP_INPUT
-;
-; ALLOW_INPUT
-;     ld   a, 1
-;     ld   (ALLOW_INPUT_VAR), a
+ALLOW_INPUT
+    ld   a, 1
+    ld   (INPUT_ALLOWED), a
 
 CHECK_INPUT
     ld   a, $1a                 ; 'o'
@@ -50,8 +48,9 @@ CHECK_INPUT
     call KTEST
     call nc, ROTATE_RIGHT       ; pressed?
 
-    ; ld   a, 0
-    ; ld   (ALLOW_INPUT_VAR), a   ; disallow immediate input
+AFTER_INPUT
+    ld   a, 0
+    ld   (INPUT_ALLOWED), a     ; disallow immediate input
     ;
     ld   a, (FRAMES)            ; current timer setting.
     ld   (LAST_FRAME_TIME), a   ; store current frames
@@ -59,11 +58,12 @@ CHECK_INPUT
 SKIP_INPUT
     halt
 
+
     ;; move ball
 
     ;; check for goal
 
-    JR GAME_LOOP
+    jr GAME_LOOP
 
     ;;
     ;; DRAW SCREEN routine
@@ -237,7 +237,7 @@ BALLYX
 LAST_FRAME_TIME                 ; last frame counter value
     defb 0
 
-ALLOW_INPUT_VAR
+INPUT_ALLOWED
     defb 1
 
 ROTATION_COUNT
