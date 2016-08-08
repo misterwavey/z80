@@ -5,7 +5,7 @@ org 24000
 ;;
 INIT
     ;; set border
-    ld   a, 0                   ; black colour
+    ld   a, 7                   ; black colour
     out  ($fe), a               ; permanent border
 
     ;; clear all attrs to black
@@ -28,13 +28,14 @@ GAME_LOOP
     ld   hl, LAST_FRAME_TIME    ; time of last check
     ld   a, (FRAMES)            ; current timer setting.
     sub  (hl)
-    cp   3                     ; 1/2 second elapsed?
+    cp   20                      ; 1/2 second elapsed?
     jr   nc, ALLOW_INPUT        ; window exceeded?
 
     ld   a, (INPUT_ALLOWED)
     cp   0
     jr   nz, CHECK_INPUT
     jr   SKIP_INPUT
+
 ALLOW_INPUT
     ld   a, 1
     ld   (INPUT_ALLOWED), a
@@ -51,19 +52,93 @@ CHECK_INPUT
 AFTER_INPUT
     ld   a, 0
     ld   (INPUT_ALLOWED), a     ; disallow immediate input
-    ;
-    ld   a, (FRAMES)            ; current timer setting.
-    ld   (LAST_FRAME_TIME), a   ; store current frames
 
 SKIP_INPUT
     halt
 
-
     ;; move ball
+    ld   hl, (LAST_BALL_FRAME)
+    ld   a, (FRAMES)
+    sub  (hl)
+    cp   25
+    jr   nc, HANDLE_BALL
+    jr   SKIP_BALL
 
+HANDLE_BALL
+    ld   hl, BALLYX
+    ld   d, (hl)                ; put yx coords in de
+    inc  hl
+    ld   e, (hl)
+    ex   de, hl                 ; put yx coords in hl
+    inc  l                      ; look 1 row below y
+    call ATADD                  ; is it clear?
+    and  7                      ; only want bits pertaining to ink.
+    cp   7                      ; is it white (7)?
+    jr   nz, MOVE_BALL          ; no? lower ball
+    jr   SKIP_BALL              ; yes? don't move ball
+
+MOVE_BALL
+    dec  l                      ; undo the '1 row below' move
+    dec  l                      ; look 1 row above, now
+    call ERASE_BALL
+    inc  l                      ; back to current
+    call DRAW_BALL
+    inc  l
+    ld   d,l
+    ld   e,h
+    ld   (BALLYX), de           ; update position
+
+SKIP_BALL
     ;; check for goal
 
-    jr GAME_LOOP
+    ld   a, (FRAMES)            ; current timer setting.
+    ld   (LAST_FRAME_TIME), a   ; store current frames
+    ld   (LAST_BALL_FRAME), a   ; store current frames
+
+    jr   GAME_LOOP
+
+;;
+;; erase ball
+;;
+ERASE_BALL
+    call ATADD
+    ld   a, 0
+    ld   (de), a
+    ret
+
+;;
+;; draw ball
+;;
+DRAW_BALL
+    call ATADD
+    ld   a, 20
+    ld   (de), a
+    ret
+
+;;
+;; get attribute address in de (attribute in a) given
+;; character position (x,y) in hl
+;;
+
+ATADD
+    push hl
+    ld   a, l                   ; vertical coordinate.
+    rrca                        ; multiply by 32.
+    rrca                        ; Shifting right with carry 3 times is
+    rrca                        ; quicker than shifting left 5 times.
+    ld   e, a
+    and  3
+    add  a, 88                  ; 88x256=address of attributes.
+    ld   d, a
+    ld   a, e
+    and  224
+    ld   e, a
+    ld   a, h                   ; horizontal position.
+    add  a, e
+    ld   e, a                   ; de=address of attributes.
+    ld   a, (de)                ; return with attribute in accumulator.
+    pop  hl
+    ret
 
     ;;
     ;; DRAW SCREEN routine
@@ -232,9 +307,12 @@ KTEST1
 ;; 0 23 35 00100011   P 22 34 00100010  EN 21 33 00100001  SP 20 32 00100000
 
 BALLYX
-    defb 0,0
+    defb 4,4
 
 LAST_FRAME_TIME                 ; last frame counter value
+    defb 0
+
+LAST_BALL_FRAME                 ; last frame counter value
     defb 0
 
 INPUT_ALLOWED
