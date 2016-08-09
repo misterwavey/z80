@@ -1,5 +1,9 @@
 org 24000
 
+ATTRS_START                 equ $5800
+BRIGHT_WHITE_INK_ON_BLACK   equ 127
+FRAMES                      equ $5C78       ; frame counter 23672d
+
 ;;
 ;; execution begins
 ;;
@@ -28,39 +32,28 @@ GAME_LOOP
     ld   hl, LAST_FRAME_TIME    ; time of last check
     ld   a, (FRAMES)            ; current timer setting.
     sub  (hl)
-    cp   20                      ; 1/2 second elapsed?
-    jr   nc, ALLOW_INPUT        ; window exceeded?
-
-    ld   a, (INPUT_ALLOWED)
-    cp   0
-    jr   nz, CHECK_INPUT
+    cp   15                     ; 1/2 second elapsed?
+    jr   nc, CHECK_INPUT         ; window exceeded?
     jr   SKIP_INPUT
 
-ALLOW_INPUT
-    ld   a, 1
-    ld   (INPUT_ALLOWED), a
-
 CHECK_INPUT
-    ld   a, $1a                 ; 'o'
+    ld   a, $1a                 ; 'o' 26d
     call KTEST
     call nc, ROTATE_LEFT        ; pressed?
 
-    ld   a, $22                 ; 'p'
+    ld   a, $22                 ; 'p' 34d
     call KTEST
     call nc, ROTATE_RIGHT       ; pressed?
 
-AFTER_INPUT
-    ld   a, 0
-    ld   (INPUT_ALLOWED), a     ; disallow immediate input
+    ld   a, (FRAMES)            ; current timer setting.
+    ld   (LAST_FRAME_TIME), a   ; store current frames
 
 SKIP_INPUT
-    halt
-
     ;; move ball
-    ld   hl, (LAST_BALL_FRAME)
+    ld   hl, LAST_BALL_FRAME
     ld   a, (FRAMES)
     sub  (hl)
-    cp   25
+    cp   10
     jr   nc, HANDLE_BALL
     jr   SKIP_BALL
 
@@ -79,21 +72,22 @@ HANDLE_BALL
 
 MOVE_BALL
     dec  l                      ; undo the '1 row below' move
-    dec  l                      ; look 1 row above, now
+    dec  l                      ; look 1 row above to erase old pos
     call ERASE_BALL
     inc  l                      ; back to current
     call DRAW_BALL
-    inc  l
-    ld   d,l
-    ld   e,h
-    ld   (BALLYX), de           ; update position
+    inc  l                      ; move down 1 row
+    ld   d, l                   ; swap h/l for saving
+    ld   e, h
+    ld   (BALLYX), de           ; save new position
+
+    ld   a, (FRAMES)            ; current timer setting.
+    ld   (LAST_BALL_FRAME), a   ; store current frames
 
 SKIP_BALL
     ;; check for goal
 
-    ld   a, (FRAMES)            ; current timer setting.
-    ld   (LAST_FRAME_TIME), a   ; store current frames
-    ld   (LAST_BALL_FRAME), a   ; store current frames
+    halt
 
     jr   GAME_LOOP
 
@@ -313,7 +307,7 @@ LAST_FRAME_TIME                 ; last frame counter value
     defb 0
 
 LAST_BALL_FRAME                 ; last frame counter value
-    defb 0
+    defb 255
 
 INPUT_ALLOWED
     defb 1
@@ -453,10 +447,6 @@ MAP
     ; defb 416,                                                    429,430,431
     ; defb 448,                                                    461,462,463
     ; defb 480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496
-
-ATTRS_START                 equ $5800
-BRIGHT_WHITE_INK_ON_BLACK   equ 127
-FRAMES                      equ $5C78       ; frame counter
 
 
 ;  1 2 3 4 5 6 7 8 9 0 A B C D E F
