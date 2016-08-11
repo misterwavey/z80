@@ -7,7 +7,7 @@ FRAMES                      equ $5C78       ; frame counter 23672d
 ;;
 ;; execution begins
 ;;
-INIT
+init:
     ;; set border
     ld   a, 7                   ; black colour
     out  ($fe), a               ; permanent border
@@ -15,67 +15,69 @@ INIT
     ;; clear all attrs to black
     ld   hl, ATTRS_START        ; $5800
     ld   bc, 32*24              ; 32 columns x 24 rows
-CLEAR_ATTR
+clear_attr:
     ld   (hl), 0                ; black is black ink 1x0 + black paper 8x0 = 0
     inc  hl
     dec  bc                     ; 16 bit decrement ...
     ld   a, b                   ; check if b
     or   c                      ; and c both zero
-    jr   nz, CLEAR_ATTR         ; loop to set all attrs to 0
+    jr   nz, clear_attr         ; loop to set all attrs to 0
 
-    call SETUP_MAP_AND_DRAW
+    call setup_map_and_draw
 
+    call rotate_90_right
+    
     ;;
     ;; main loop - no exit
     ;;
-GAME_LOOP
+game_loop:
     ld   hl, LAST_FRAME_TIME    ; time of last check
     ld   a, (FRAMES)            ; current timer setting.
     sub  (hl)
     cp   15                     ; 1/2 second elapsed?
-    jr   nc, CHECK_INPUT         ; window exceeded?
-    jr   SKIP_INPUT
+    jr   nc, check_input         ; window exceeded?
+    jr   skip_input
 
-CHECK_INPUT
+check_input:
     ld   a, $1a                 ; 'o' 26d
-    call KTEST
-    call nc, ROTATE_LEFT        ; pressed?
+    call ktest
+    call nc, rotate_left        ; pressed?
 
     ld   a, $22                 ; 'p' 34d
-    call KTEST
-    call nc, ROTATE_RIGHT       ; pressed?
+    call ktest
+    call nc, rotate_right       ; pressed?
 
     ld   a, (FRAMES)            ; current timer setting.
     ld   (LAST_FRAME_TIME), a   ; store current frames
 
-SKIP_INPUT
+skip_input:
     ;; move ball
     ld   hl, LAST_BALL_FRAME
     ld   a, (FRAMES)
     sub  (hl)
     cp   10
-    jr   nc, HANDLE_BALL
-    jr   SKIP_BALL
+    jr   nc, handle_ball
+    jr   skip_ball
 
-HANDLE_BALL
+handle_ball:
     ld   hl, BALLYX
     ld   d, (hl)                ; put yx coords in de
     inc  hl
     ld   e, (hl)
     ex   de, hl                 ; put yx coords in hl
     inc  l                      ; look 1 row below y
-    call ATADD                  ; is it clear?
+    call atadd                  ; is it clear?
     and  7                      ; only want bits pertaining to ink.
     cp   7                      ; is it white (7)?
-    jr   nz, MOVE_BALL          ; no? lower ball
-    jr   SKIP_BALL              ; yes? don't move ball
+    jr   nz, move_ball          ; no? lower ball
+    jr   skip_ball              ; yes? don't move ball
 
-MOVE_BALL
+move_ball:
     dec  l                      ; undo the '1 row below' move
     dec  l                      ; look 1 row above to erase old pos
-    call ERASE_BALL
+    call erase_ball
     inc  l                      ; back to current
-    call DRAW_BALL
+    call draw_ball
     inc  l                      ; move down 1 row
     ld   d, l                   ; swap h/l for saving
     ld   e, h
@@ -84,18 +86,18 @@ MOVE_BALL
     ld   a, (FRAMES)            ; current timer setting.
     ld   (LAST_BALL_FRAME), a   ; store current frames
 
-SKIP_BALL
+skip_ball:
     ;; check for goal
 
     halt
 
-    jr   GAME_LOOP
+    jr   game_loop
 
 ;;
 ;; erase ball
 ;;
-ERASE_BALL
-    call ATADD
+erase_ball:
+    call atadd
     ld   a, 0
     ld   (de), a
     ret
@@ -103,8 +105,8 @@ ERASE_BALL
 ;;
 ;; draw ball
 ;;
-DRAW_BALL
-    call ATADD
+draw_ball:
+    call atadd
     ld   a, 20
     ld   (de), a
     ret
@@ -114,7 +116,7 @@ DRAW_BALL
 ;; character position (x,y) in hl
 ;;
 
-ATADD
+atadd:
     push hl
     ld   a, l                   ; vertical coordinate.
     rrca                        ; multiply by 32.
@@ -146,44 +148,44 @@ ATADD
     ;       inc attr
     ;   inc attr row
 
-DRAW_SCREEN
+draw_screen:
     ld   hl, ATTRS_START
     ld   de, MAP                ; start of screen map bytes
     ld   b, 16                  ; rows of bytes in map
 
-LOOP_OVER_ROWS_IN_MAP
+loop_over_rows_in_map:
     push bc
     push hl
     ld   b, 2                   ; 2 bytes per row
 
-LOOP_OVER_BYTES_IN_ROW
+loop_over_bytes_in_row:
     push bc
     ld   b, 8                   ; rotatesize: bits to process per byte
     ld   a, (de)                ; take byte from map
     ld   c, a                   ; we'll use c to rotate byte
 
-LOOP_OVER_ROTATESIZE
+loop_over_rotatesize:
     rl   c                      ; rotate bit 7 into carry
-    jp   nc, SET_BLANK_CELL     ; got a carry?
+    jp   nc, set_blank_cell     ; got a carry?
     ld   a, BRIGHT_WHITE_INK_ON_BLACK ; yep
-    jp   DRAW_CELL
+    jp   draw_cell
 
-SET_BLANK_CELL
+set_blank_cell:
     ld   a, 0                   ; didn't have carry, draw black cell
-DRAW_CELL
+draw_cell:
     ld   (hl), a                ; colour attr using A
     inc  hl                     ; next attr
-    djnz LOOP_OVER_ROTATESIZE   ; dec rotate count and rotate until done
+    djnz loop_over_rotatesize   ; dec rotate count and rotate until done
 
     inc  de                     ; next byte in map
     pop  bc
-    djnz LOOP_OVER_BYTES_IN_ROW
+    djnz loop_over_bytes_in_row
 
     pop  hl
     ld   bc, 32                 ; next attr row
     add  hl, bc
     pop  bc
-    djnz LOOP_OVER_ROWS_IN_MAP
+    djnz loop_over_rows_in_map
 
     ret
 
@@ -191,25 +193,25 @@ DRAW_CELL
     ;; INIT_MAP routine
     ;; accumulator needs to hold 0,1,2,3 for 0,90,180,270 version of map
     ;;
-SETUP_MAP
+setup_map:
     cp  3
-    jr  z, HANDLE_270
+    jr  z, handle_270
     cp  2
-    jr  z, HANDLE_180
+    jr  z, handle_180
     cp  1
-    jr  z, HANDLE_90
+    jr  z, handle_90
     ld  hl, MAP_0               ; handle 0
-    jr  POPULATE_MAP
-HANDLE_270
+    jr  populate_map
+handle_270:
     ld  hl, MAP_270
-    jr  POPULATE_MAP
-HANDLE_180
+    jr  populate_map
+handle_180:
     ld  hl, MAP_180
-    jr  POPULATE_MAP
-HANDLE_90
+    jr  populate_map
+handle_90:
     ld  hl, MAP_90
-    jr  POPULATE_MAP
-POPULATE_MAP
+    jr  populate_map
+populate_map:
     ld  de, MAP
     ld  bc, 32
     ldir
@@ -218,7 +220,7 @@ POPULATE_MAP
     ;;
     ;; rotate map_template into map area
     ;;
-ROTATE_RIGHT
+rotate_right:
     ; call DEBUG_P
 
 ; loop over rows in map 1..16
@@ -232,26 +234,26 @@ ROTATE_RIGHT
     ld   a, (ROTATION_COUNT)
     inc  a
     cp   4
-    jr   nz, DONE_SETUP_DEGREES_R
+    jr   nz, done_setup_degrees_r
     ld   a, 0                   ; was 4, loop over to 0
-DONE_SETUP_DEGREES_R
-    call SETUP_MAP_AND_DRAW
+done_setup_degrees_r:
+    call setup_map_and_draw
     ret
 
-ROTATE_LEFT
+rotate_left:
     ld   a, (ROTATION_COUNT)
     dec  a
     cp   -1
-    jr   nz, DONE_SETUP_DEGREES_L
+    jr   nz, done_setup_degrees_l
     ld   a, 3                   ; was 0, loop over to 3
-DONE_SETUP_DEGREES_L
-    call SETUP_MAP_AND_DRAW
+done_setup_degrees_l:
+    call setup_map_and_draw
     ret
 
-SETUP_MAP_AND_DRAW
+setup_map_and_draw:
     ld   (ROTATION_COUNT), a
-    call SETUP_MAP
-    call DRAW_SCREEN
+    call setup_map
+    call draw_screen
     ret
 
 ; Credit for this must go to Stephen Jones, a programmer who used to
@@ -265,7 +267,7 @@ SETUP_MAP_AND_DRAW
 
 ; Mr. Jones' keyboard test routine.
 
-KTEST
+ktest:
     ld   c, a                   ; key to test in c.
     and  7                      ; mask bits d0-d2 for row.
     inc  a                      ; in range 1-8.
@@ -277,14 +279,14 @@ KTEST
     sub  c                      ; subtract position.
     ld   c, a                   ; put in c.
     ld   a, $FE                 ; high byte of port to read.
-KTEST0
+ktest0:
     rrca                        ; rotate into position.
-    djnz KTEST0                 ; repeat until we've found relevant row.
+    djnz ktest0                 ; repeat until we've found relevant row.
     in    a, ($FE)              ; read port (a=high, 254=low).
-KTEST1
+ktest1:
     rra                         ; rotate bit out of result.
     dec   c                     ; loop counter.
-    jp    nz, KTEST1            ; repeat until bit for position in carry.
+    jp    nz, ktest1            ; repeat until bit for position in carry.
     ret
 
 ;; KEY_SCAN key codes: hex, decimal, binary
@@ -301,7 +303,7 @@ KTEST1
 ;; 0 23 35 00100011   P 22 34 00100010  EN 21 33 00100001  SP 20 32 00100000
 
 BALLYX
-    defb 4,4
+    defb 3,3
 
 LAST_FRAME_TIME                 ; last frame counter value
     defb 0
@@ -325,7 +327,7 @@ MAP_0
     defb 10000000b,00000001b
     defb 10000000b,10000001b
     defb 10000000b,10000001b
-    defb 11000011b,11100011b
+    defb 11011111b,11100011b
 
     defb 10000000b,10000001b
     defb 10000000b,10000001b
@@ -340,8 +342,8 @@ MAP_90
     defb 11111111b,11111111b
     defb 10000000b,10000011b
     defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
     defb 10000000b,10000001b
     defb 10000000b,10000001b
     defb 10000011b,11100001b
@@ -363,7 +365,7 @@ MAP_180
     defb 10000000b,00000001b
     defb 10000000b,10000001b
     defb 10000000b,10000001b
-    defb 11000011b,11100011b
+    defb 11000011b,11111011b
 
     defb 10000000b,10000001b
     defb 10000000b,10000001b
@@ -386,9 +388,9 @@ MAP_270
 
     defb 10000000b,10000001b
     defb 10000000b,10000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
+    defb 10000000b,10000001b
     defb 10000000b,00000001b
     defb 11000000b,10000001b
     defb 11111111b,11111111b
@@ -495,6 +497,8 @@ MAP
 ;23 5ac0 .. 5adf
 ;24 5ae0 .. 5aff
 
-sizeofALL: equ $-INIT
+include rotate.asm
+
+sizeofALL: equ $-init
 
     end 24000
