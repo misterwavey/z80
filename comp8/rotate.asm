@@ -8,8 +8,11 @@ rotate_90_right:
 loop_over_c:
     ld   b, 0                   ; j
     loop_over_b:
-        ld   h, b
-        ld   l, c
+        ld   a, 15
+        sub  b
+        dec  a
+        ld   l, a
+        ld   h, c
         call atadd                  ; a := attr of ATTRS[l,h]
 
         ld   de, MAP_Y
