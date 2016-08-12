@@ -25,8 +25,8 @@ clear_attr:
 
     call setup_map_and_draw
 
-    call rotate_90_right
-    
+;    call rotate_90_right
+
     ;;
     ;; main loop - no exit
     ;;
@@ -41,11 +41,12 @@ game_loop:
 check_input:
     ld   a, $1a                 ; 'o' 26d
     call ktest
-    call nc, rotate_left        ; pressed?
+    ; call nc, rotate_left        ; pressed?
+    call nc, rotate_left_new    ; pressed?
 
     ld   a, $22                 ; 'p' 34d
     call ktest
-    call nc, rotate_right       ; pressed?
+    call nc, rotate_right_new   ; pressed?
 
     ld   a, (FRAMES)            ; current timer setting.
     ld   (LAST_FRAME_TIME), a   ; store current frames
@@ -200,7 +201,8 @@ setup_map:
     jr  z, handle_180
     cp  1
     jr  z, handle_90
-    ld  hl, MAP_0               ; handle 0
+handle_0:                       ; fallthrough
+    ld  hl, MAP_0
     jr  populate_map
 handle_270:
     ld  hl, MAP_270
@@ -217,20 +219,43 @@ populate_map:
     ldir
     ret
 
+rotate_right_new:
+    call rotate_90_right
+    call draw_map_y
+    ret
+
+rotate_left_new:
+    call rotate_90_left
+    call draw_map_y
+    ret
+
+draw_map_y:
+    ld   c, 0                   ; i
+loop_over_c:
+    ld   b, 0                   ; j
+    loop_over_b:
+        ld   de, MAP_Y
+        call GetElement             ; a := MAP_Y[c,b]
+        push af
+        ld   h, b
+        ld   l, c
+        call atadd                  ; de := address of ATTRS[b,c]
+        pop af
+        ld   (de), a
+        inc  b
+        ld   a, 16
+        cp   b
+        jr   nz, loop_over_b
+    inc  c
+    ld   a, 16
+    cp   c
+    jr   nz, loop_over_c
+    ret
+
     ;;
     ;; rotate map_template into map area
     ;;
 rotate_right:
-    ; call DEBUG_P
-
-; loop over rows in map 1..16
-;   loop over bytes in row 1..2
-;     loop over rotatesize 1..8
-;       rotate MAP_TEMPLATE byte bit 7 into carry
-;       rotate from carry into MAP byte bit 0
-;       inc attr
-;   inc attr row
-
     ld   a, (ROTATION_COUNT)
     inc  a
     cp   4

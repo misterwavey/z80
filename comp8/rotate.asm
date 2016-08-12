@@ -5,15 +5,15 @@
 
 rotate_90_right:
     ld   c, 0                   ; i
-loop_over_c:
+loop_over_c_r:
     ld   b, 0                   ; j
-    loop_over_b:
-        ld   a, 15
+    loop_over_b_r:
+        ld   a, 16
         sub  b
         dec  a
         ld   l, a
         ld   h, c
-        call atadd                  ; a := attr of ATTRS[l,h]
+        call atadd                  ; a := attr of ATTRS[16-b-1, c]
 
         ld   de, MAP_Y
         call SetElement             ; MAP_Y[c,b] := a
@@ -21,14 +21,39 @@ loop_over_c:
         inc  b
         ld   a, 16
         cp   b
-        jr   nz, loop_over_b
+        jr   nz, loop_over_b_r
     inc  c
     ld   a, 16
     cp   c
-    jr   nz, loop_over_c
+    jr   nz, loop_over_c_r
 
     ret
 
+rotate_90_left:
+    ld   c, 0                   ; i
+loop_over_c_l:
+    ld   b, 0                   ; j
+    loop_over_b_l:
+        ld   a, 16
+        sub  c
+        dec  a
+        ld   h, a
+        ld   l, b
+        call atadd                  ; a := attr of ATTRS[b,16-c-1]
+
+        ld   de, MAP_Y
+        call SetElement             ; MAP_Y[c,b] := a
+
+        inc  b
+        ld   a, 16
+        cp   b
+        jr   nz, loop_over_b_l
+    inc  c
+    ld   a, 16
+    cp   c
+    jr   nz, loop_over_c_l
+
+    ret
 ;ld a, 46
 ;loop1:
 ;   ld b, 64
@@ -56,11 +81,14 @@ loop_over_c:
 ;        }
 ; }
 
+ ;left: = matrix[j][n - i - 1];
+
 ;;
 ;; de is address of matrix
 ;; c is row
 ;; b is column
 ;; a is element value to be set
+;; trashes hl
 ;;
 ;; matrix[c,b] := a
 ;;
@@ -78,6 +106,27 @@ SetElement:
     ld   (hl), a	            ; set element
     ret
 
+;;
+;; de is address of matrix
+;; c is row
+;; b is column
+;; trashes hl
+;;
+;; a := matrix[c,b]
+;;
+GetElement:
+    ld   l, c                   ;get row
+    ld   h, 0
+    add  hl, hl                 ; *2
+    add  hl, hl                 ; *4
+    add  hl, hl	                ; *8
+    add  hl, hl                 ; *16 -> hl = c * 16
+    add  hl, de	                ; add to matrix pointer
+    ld   e, b	                ; get column
+    ld   d, 0
+    add  hl, de
+    ld   a, (hl)	            ; get element
+    ret
 
 
 MAP_Y
