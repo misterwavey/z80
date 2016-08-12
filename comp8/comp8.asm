@@ -1,3 +1,10 @@
+;;
+;; comp8.asm
+;; zx asm facebook group compo #8
+;;
+;; stuart martin 2016
+;;
+
 org 24000
 
 ATTRS_START                 equ $5800
@@ -9,7 +16,7 @@ FRAMES                      equ $5C78       ; frame counter 23672d
 ;;
 init:
     ;; set border
-    ld   a, 7                   ; black colour
+    ld   a, 0                   ; black colour
     out  ($fe), a               ; permanent border
 
     ;; clear all attrs to black
@@ -23,9 +30,7 @@ clear_attr:
     or   c                      ; and c both zero
     jr   nz, clear_attr         ; loop to set all attrs to 0
 
-    call setup_map_and_draw
-
-;    call rotate_90_right
+    call draw_map
 
     ;;
     ;; main loop - no exit
@@ -41,7 +46,6 @@ game_loop:
 check_input:
     ld   a, $1a                 ; 'o' 26d
     call ktest
-    ; call nc, rotate_left        ; pressed?
     call nc, rotate_left_new    ; pressed?
 
     ld   a, $22                 ; 'p' 34d
@@ -115,7 +119,7 @@ draw_ball:
 ;;
 ;; get attribute address in de (attribute in a) given
 ;; character position (x,y) in hl
-;;
+;; from 'how to write spectrum games' by jonathan cauldwell
 
 atadd:
     push hl
@@ -137,104 +141,22 @@ atadd:
     pop  hl
     ret
 
-    ;;
-    ;; DRAW SCREEN routine
-    ;;
-
-    ; loop over rows in map 1..16
-    ;   loop over bytes in row 1..2
-    ;     loop over rotatesize 1..8
-    ;       rotate byte
-    ;       draw bit
-    ;       inc attr
-    ;   inc attr row
-
-draw_screen:
-    ld   hl, ATTRS_START
-    ld   de, MAP                ; start of screen map bytes
-    ld   b, 16                  ; rows of bytes in map
-
-loop_over_rows_in_map:
-    push bc
-    push hl
-    ld   b, 2                   ; 2 bytes per row
-
-loop_over_bytes_in_row:
-    push bc
-    ld   b, 8                   ; rotatesize: bits to process per byte
-    ld   a, (de)                ; take byte from map
-    ld   c, a                   ; we'll use c to rotate byte
-
-loop_over_rotatesize:
-    rl   c                      ; rotate bit 7 into carry
-    jp   nc, set_blank_cell     ; got a carry?
-    ld   a, BRIGHT_WHITE_INK_ON_BLACK ; yep
-    jp   draw_cell
-
-set_blank_cell:
-    ld   a, 0                   ; didn't have carry, draw black cell
-draw_cell:
-    ld   (hl), a                ; colour attr using A
-    inc  hl                     ; next attr
-    djnz loop_over_rotatesize   ; dec rotate count and rotate until done
-
-    inc  de                     ; next byte in map
-    pop  bc
-    djnz loop_over_bytes_in_row
-
-    pop  hl
-    ld   bc, 32                 ; next attr row
-    add  hl, bc
-    pop  bc
-    djnz loop_over_rows_in_map
-
-    ret
-
-    ;;
-    ;; INIT_MAP routine
-    ;; accumulator needs to hold 0,1,2,3 for 0,90,180,270 version of map
-    ;;
-setup_map:
-    cp  3
-    jr  z, handle_270
-    cp  2
-    jr  z, handle_180
-    cp  1
-    jr  z, handle_90
-handle_0:                       ; fallthrough
-    ld  hl, MAP_0
-    jr  populate_map
-handle_270:
-    ld  hl, MAP_270
-    jr  populate_map
-handle_180:
-    ld  hl, MAP_180
-    jr  populate_map
-handle_90:
-    ld  hl, MAP_90
-    jr  populate_map
-populate_map:
-    ld  de, MAP
-    ld  bc, 32
-    ldir
-    ret
-
 rotate_right_new:
     call rotate_90_right
-    call draw_map_y
+    call draw_map
     ret
 
 rotate_left_new:
     call rotate_90_left
-    call draw_map_y
+    call draw_map
     ret
 
-draw_map_y:
+draw_map:
     ld   c, 0                   ; i
 loop_over_c:
     ld   b, 0                   ; j
     loop_over_b:
-        ld   de, MAP_Y
+        ld   de, MAP
         call GetElement             ; a := MAP_Y[c,b]
         push af
         ld   h, b
@@ -250,35 +172,6 @@ loop_over_c:
     ld   a, 16
     cp   c
     jr   nz, loop_over_c
-    ret
-
-    ;;
-    ;; rotate map_template into map area
-    ;;
-rotate_right:
-    ld   a, (ROTATION_COUNT)
-    inc  a
-    cp   4
-    jr   nz, done_setup_degrees_r
-    ld   a, 0                   ; was 4, loop over to 0
-done_setup_degrees_r:
-    call setup_map_and_draw
-    ret
-
-rotate_left:
-    ld   a, (ROTATION_COUNT)
-    dec  a
-    cp   -1
-    jr   nz, done_setup_degrees_l
-    ld   a, 3                   ; was 0, loop over to 3
-done_setup_degrees_l:
-    call setup_map_and_draw
-    ret
-
-setup_map_and_draw:
-    ld   (ROTATION_COUNT), a
-    call setup_map
-    call draw_screen
     ret
 
 ; Credit for this must go to Stephen Jones, a programmer who used to
@@ -338,161 +231,6 @@ LAST_BALL_FRAME                 ; last frame counter value
 
 INPUT_ALLOWED
     defb 1
-
-ROTATION_COUNT
-    defb 0                      ; 0=0 degrees, 1=90 degrees, 2=180, 3=270
-
-    ;; rotated versions of the screen map for 0, 90, 180, 270 degrees
-
-MAP_0
-    defb 11111111b,11111111b
-    defb 11000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 11011111b,11100011b
-
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000111b
-    defb 10000000b,00000111b
-    defb 11111111b,11111111b
-
-MAP_90
-    defb 11111111b,11111111b
-    defb 10000000b,10000011b
-    defb 10000000b,00000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000011b,11100001b
-
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 11100000b,00000001b
-    defb 11100000b,10000001b
-    defb 11111111b,11111111b
-
-MAP_180
-    defb 11111111b,11111111b
-    defb 11100000b,00000001b
-    defb 11100000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 11000011b,11111011b
-
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,00000011b
-    defb 11111111b,11111111b
-
-MAP_270
-    defb 11111111b,11111111b
-    defb 10000000b,10000111b
-    defb 10000000b,00000111b
-    defb 10000000b,00000001b
-    defb 10000000b,00000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000011b,11100001b
-
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,10000001b
-    defb 10000000b,00000001b
-    defb 11000000b,10000001b
-    defb 11111111b,11111111b
-
-    ;; AREA THAT EACH TEMPLATE IS COPIED INTO
-MAP
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-    defb 0,0
-
-    ; defb  0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-    ; defb 17, 1,                                       14
-    ; defb 17,                                          15
-    ; defb 17,                                          15
-    ; defb 17,                                          15
-    ; defb 17,                   7,                      8
-    ; defb 17,                   7,                      8
-    ; defb 17,1,             4,1,1,1,1,               5, 1
-    ; defb 17,                   7,                      8
-    ; defb 17,                   7,                      8
-    ; defb 17,                                          15
-    ; defb 17,                                          15
-    ; defb 17,                                          15
-    ; defb 17,                                    13, 1, 1
-    ; defb 17,                                    13, 1, 1
-    ; defb 17, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-    ; defb 255
-
-    ; defb 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10,  11,  12,  13,  14,  15
-    ; defb 32, 33,                                                          47
-    ; defb 64,                                                              79
-    ; defb 96,                                                             111
-    ; defb 128,                                                            143
-    ; defb 160,                         168,                               175
-    ; defb 192,                         200,                               207
-    ; defb 224,225,             229,230,231,232,233,                   238,239
-    ; defb 256,                         263,                               271
-    ; defb 288,                         295,                               303
-    ; defb 320,                                                            335
-    ; defb 352,                                                            367
-    ; defb 384,                                                            399
-    ; defb 416,                                                    429,430,431
-    ; defb 448,                                                    461,462,463
-    ; defb 480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496
-
-
-;  1 2 3 4 5 6 7 8 9 0 A B C D E F
-;1 x x x x x x x x x x x x x x x x
-;2 x x                           x
-;3 x                             x
-;4 x                             x
-;5 x                             x
-;6 x             x               x
-;7 x             x               x
-;8 x x       x x x x x         x x
-;9 x             x               x
-;A x             x               x
-;B x                             x
-;C x                             x
-;D x                         x x x
-;E x                         x x x
-;F x x x x x x x x x x x x x x x x
-
 
 ; ATTR DISPLAY FILE
 ; 32 WIDE X 24 HIGH = 768 cells
