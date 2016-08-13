@@ -12,7 +12,7 @@
 ;
 ; for (int i = 0; i < n; ++i) {
 ;        for (int j = 0; j < n; ++j) {
-;            ret[i, j] = matrix[n - j - 127, i];
+;            ret[i, j] = matrix[n - j - 1, i];
 ;        }
 ; }
 ;
@@ -28,10 +28,10 @@ loop_over_c_r:
         dec  a
         ld   l, a
         ld   h, c
-        call atadd                  ; a := attr of ATTRS[16-b-127, c]
+        call atadd                  ; a := attr of ATTRS[16-b-1, c]
 
         ld   de, MAP
-        call SetElement             ; MAP_Y[c,b] := a
+        call set_element             ; MAP_Y[c,b] := a
 
         inc  b
         ld   a, 16
@@ -62,7 +62,7 @@ loop_over_c_l:
         call atadd                  ; a := attr of ATTRS[b,16-c-1]
 
         ld   de, MAP
-        call SetElement             ; MAP_Y[c,b] := a
+        call set_element             ; MAP_Y[c,b] := a
 
         inc  b
         ld   a, 16
@@ -84,7 +84,7 @@ loop_over_c_l:
 ;;
 ;; matrix[c,b] := a
 ;;
-SetElement:
+set_element:
     ld   l, c                   ;get row
     ld   h, 0
     add  hl, hl                 ; *2
@@ -96,28 +96,6 @@ SetElement:
     ld   d, 0
     add  hl, de
     ld   (hl), a	            ; set element
-    ret
-
-;;
-;; de is address of matrix
-;; c is row
-;; b is column
-;; trashes hl
-;;
-;; a := matrix[c,b]
-;;
-GetElement:
-    ld   l, c                   ;get row
-    ld   h, 0
-    add  hl, hl                 ; *2
-    add  hl, hl                 ; *4
-    add  hl, hl	                ; *8
-    add  hl, hl                 ; *16 -> hl = c * 16
-    add  hl, de	                ; add to matrix pointer
-    ld   e, b	                ; get column
-    ld   d, 0
-    add  hl, de
-    ld   a, (hl)	            ; get element
     ret
 
 MAP
