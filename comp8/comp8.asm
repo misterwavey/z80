@@ -1,5 +1,8 @@
 ;;
 ;; comp8.asm
+;;
+;; z80 assembly for zx spectrum
+;;
 ;; zx asm facebook group compo #8
 ;;
 ;; stuart martin 2016
@@ -152,26 +155,23 @@ rotate_left_new:
     ret
 
 draw_map:
-    ld   c, 0                   ; i
-loop_over_c:
-    ld   b, 0                   ; j
-    loop_over_b:
-        ld   de, MAP
-        call GetElement             ; a := MAP_Y[c,b]
-        push af
-        ld   h, b
-        ld   l, c
-        call atadd                  ; de := address of ATTRS[b,c]
-        pop af
-        ld   (de), a
-        inc  b
-        ld   a, 16
-        cp   b
-        jr   nz, loop_over_b
-    inc  c
-    ld   a, 16
-    cp   c
-    jr   nz, loop_over_c
+    ld   de, ATTRS_START
+    ld   hl, MAP
+    ld   b, 16                 ; process 16 rows
+draw_row:
+    push bc
+    ld   bc, 16                 ; process 16 chars in row
+    ldir                        ; draw 1 whole row
+    pop  bc
+
+    push bc
+    ex   de, hl
+    ld   bc, 16
+    adc  hl, bc
+    ex   de, hl                 ; de := next ATTR row
+    pop  bc
+
+    djnz draw_row
     ret
 
 ; Credit for this must go to Stephen Jones, a programmer who used to
