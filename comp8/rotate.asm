@@ -16,7 +16,7 @@
 ;        }
 ; }
 ;
-; left: = matrix[j][n - i - 1];
+; for left: = matrix[j][n - i - 1];
 
 rotate_90_right:
     ld   c, 0                   ; i
@@ -28,10 +28,10 @@ loop_over_c_r:
         dec  a
         ld   l, a
         ld   h, c
-        call atadd                  ; a := attr of ATTRS[16-b-1, c]
+        call atadd              ; a := attr of ATTRS[16-b-1, c]
 
         ld   de, MAP
-        call set_element             ; MAP_Y[c,b] := a
+        call set_element        ; MAP_Y[c,b] := a
 
         inc  b
         ld   a, 16
@@ -59,10 +59,10 @@ loop_over_c_l:
         dec  a
         ld   h, a
         ld   l, b
-        call atadd                  ; a := attr of ATTRS[b,16-c-1]
+        call atadd              ; a := attr of ATTRS[b,16-c-1]
 
         ld   de, MAP
-        call set_element             ; MAP_Y[c,b] := a
+        call set_element        ; MAP_Y[c,b] := a
 
         inc  b
         ld   a, 16
@@ -96,6 +96,16 @@ set_element:
     ld   d, 0
     add  hl, de
     ld   (hl), a	            ; set element
+    cp   20
+    jp   z, process_ball_rotate
+    ret
+process_ball_rotate:
+    push bc
+    ld   a, c
+    ld   c, b
+    ld   b, a
+    ld   (BALLYX), bc
+    pop  bc
     ret
 
 MAP
