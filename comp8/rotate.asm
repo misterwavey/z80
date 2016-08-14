@@ -96,15 +96,15 @@ set_element:
     ld   d, 0
     add  hl, de
     ld   (hl), a	            ; set element
-    cp   20
+    cp   20                     ; is it the ball?
     jp   z, process_ball_rotate
-    ret
-process_ball_rotate:
+    ret                         ; no
+process_ball_rotate:            ; yes
     push bc
-    ld   a, c
+    ld   a, c                   ; swap bc into yx order
     ld   c, b
     ld   b, a
-    ld   (BALLYX), bc
+    ld   (BALLYX), bc           ; update new position
     pop  bc
     ret
 

@@ -39,12 +39,23 @@ clear_attr:
     ;; main loop - no exit
     ;;
 game_loop:
+
+    ld  a, (INPUT_ALLOWED)
+    cp  1
+    jr  z, check_input
+
     ld   hl, LAST_FRAME_TIME    ; time of last check
     ld   a, (FRAMES)            ; current timer setting.
     sub  (hl)
-    cp   15                     ; 1/2 second elapsed?
-    jr   nc, check_input         ; window exceeded?
+    cp   10                     ; 1/2 second elapsed?
+    jr   nc, allow_input        ; window exceeded?
+    ld   a, 0
+    ld   (INPUT_ALLOWED), a
     jr   skip_input
+
+allow_input:
+    ld   a, 1
+    ld   (INPUT_ALLOWED), a
 
 check_input:
     ld   a, $1a                 ; 'o' 26d
@@ -145,11 +156,15 @@ atadd:
     ret
 
 rotate_right_new:
+    ld   a, 0
+    ld   (INPUT_ALLOWED), a
     call rotate_90_right
     call draw_map
     ret
 
 rotate_left_new:
+    ld   a, 0
+    ld   (INPUT_ALLOWED), a
     call rotate_90_left
     call draw_map
     ret
