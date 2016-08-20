@@ -14,6 +14,22 @@ ATTRS_START                 equ $5800
 BRIGHT_WHITE_INK_ON_BLACK   equ 127
 FRAMES                      equ $5C78       ; frame counter 23672d
 
+;game_loop:
+; check input
+; change direction
+;
+; is it time to draw?
+;   yes incr in direction
+;   draw head
+;   draw tail
+; at wall?
+;   yes fill square
+; all filled?
+;   yes game won
+;store frames as head time
+;jr game_loop
+;
+
 ;;
 ;; execution begins
 ;;
@@ -33,105 +49,131 @@ clear_attr:
     or   c                      ; and c both zero
     jr   nz, clear_attr         ; loop to set all attrs to 0
 
-    call draw_map
-
-    ;;
-    ;; main loop - no exit
-    ;;
+;;
+;; main loop - no exit
+;;
 game_loop:
 
-    ld  a, (INPUT_ALLOWED)
-    cp  1
-    jr  z, check_input
+    ;;
+    ;; check input
+    ;;
 
-    ld   hl, LAST_FRAME_TIME    ; time of last check
-    ld   a, (FRAMES)            ; current timer setting.
-    sub  (hl)
-    cp   10                     ; 1/2 second elapsed?
-    jr   nc, allow_input        ; window exceeded?
-    ld   a, 0
-    ld   (INPUT_ALLOWED), a     ; deny input
-    jr   skip_input             ; deal with ball
-
-allow_input:
-    ld   a, 1
-    ld   (INPUT_ALLOWED), a
-
-check_input:
     ld   a, $1a                 ; 'o' 26d
     call ktest
-    call nc, rotate_left_new    ; pressed?
+    jp   nc, direction_left     ; handle if pressed
 
     ld   a, $22                 ; 'p' 34d
     call ktest
-    call nc, rotate_right_new   ; pressed?
+    jp   nc, direction_right    ; handle if pressed
 
-    ld   a, (FRAMES)            ; current timer setting.
-    ld   (LAST_FRAME_TIME), a   ; store current frames
+    ld   a, $25                 ; 'q' 37d
+    call ktest
+    jp   nc, direction_up       ; handle if pressed
 
-skip_input:
-    ;; check if we can move ball
-    ld   hl, LAST_BALL_FRAME
+    ld   a, $26                 ; 'a' 38d
+    call ktest
+    jp   nc, direction_down     ; handle if pressed
+
+    jr   after_direction        ; no input. don't change direction
+
+    ;;
+    ;; change direction
+    ;;
+direction_left:
+    ld  a, 3
+    ld  (HEAD_DIRECTION), a
+    jr  after_direction
+
+direction_right:
+    ld  a, 1
+    ld  (HEAD_DIRECTION), a
+    jr  after_direction
+
+direction_up:
+    ld  a, 0
+    ld  (HEAD_DIRECTION), a
+    jr  after_direction
+
+direction_down:
+    ld  a, 2
+    ld  (HEAD_DIRECTION), a
+    ;; fallthrough
+
+after_direction:
+    ;;
+    ;; is it time to update movement?
+    ;;
+    ld   hl, LAST_HEAD_FRAME
     ld   a, (FRAMES)
     sub  (hl)
-    cp   20                     ; enough frames between ball move?
-    jr   nc, handle_ball        ; yes
-    jr   skip_ball              ; no
+    cp   10                      ; enough frames between head move?
+    jr   nc, move_head          ; yes
+    jr   skip_move_head         ; no
 
-handle_ball:
-    ld   hl, BALLYX
-    ld   d, (hl)                ; put yx coords in de
+move_head:
+    ld   hl, HEAD_YX
+    ld   e, (hl)                ; put yx coords in de
     inc  hl
-    ld   e, (hl)
+    ld   d, (hl)
     ex   de, hl                 ; put yx coords in hl
-    inc  l                      ; look 1 row below y
-    call attribute_at_xy        ; is it clear?
-    and  7                      ; only want bits pertaining to ink.
-    cp   7                      ; is it white (7)?
-    jr   nz, move_ball          ; no? lower ball
-    jr   skip_ball              ; yes? don't move ball
 
-move_ball:
-;    dec  l                      ; undo the '1 row below' move
-    ; dec  l                      ; look 1 row above to erase old pos
-    ; call erase_ball
-;    inc  l                      ; back to current
-    call draw_ball
-;    inc  l                      ; move down 1 row
-    ld   d, l                   ; swap h/l for saving
-    ld   e, h
-    ld   (BALLYX), de           ; save new position
+    ld   a, (HEAD_DIRECTION)
+    cp   0
+    jr   z, move_head_up
+    cp   1
+    jr   z, move_head_right
+    cp   2
+    jr   z, move_head_down
+    ;; fallthrough for 3=left
 
+move_head_left:
+    dec  h                      ; x is in l
+    jr   draw_head
+
+move_head_up:
+    dec  l                      ; y is in h
+    jr   draw_head
+
+move_head_right:
+    inc  h                      ; x is in l
+    jr   draw_head
+
+move_head_down:
+    inc  l                      ; y is in h
+    ;; fallthrough to draw_head
+
+draw_head:
+    ;;
+    ;; set head attr colour
+    ;;
+    call attribute_at_xy
+    ld   a, 120
+    ld   (de), a
+
+    ;;
+    ;; save HEAD_YX
+    ;;
+
+    ; ld   d, l                   ; swap h/l for saving
+    ; ld   e, h
+    ; ld   (HEAD_YX), de           ; save new position
+    ld   (HEAD_YX), hl           ; save new position
+
+    ;;
+    ;; reset frame count for head timer
+    ;;
     ld   a, (FRAMES)            ; current timer setting.
-    ld   (LAST_BALL_FRAME), a   ; store current frames
+    ld   (LAST_HEAD_FRAME), a   ; store current frames
 
-skip_ball:
+skip_move_head:
     ;; check for goal
 
     halt
-
     jr   game_loop
 
-;;
-;; erase ball
-;;
-erase_ball:
-    call attribute_at_xy
-    ld   a, 0
-    ld   (de), a
-    ret
 
 ;;
-;; draw ball
-;;
-draw_ball:
-    call attribute_at_xy
-    ld   a, 20
-    ld   (de), a
-    ret
-
-;;
-;; get attribute address in de (attribute in a) given
+;; set attribute address in de (attribute in a) given
 ;; character position (x,y) in hl
 ;; from 'how to write spectrum games' by jonathan cauldwell
 
@@ -155,39 +197,6 @@ attribute_at_xy:
     pop  hl
     ret
 
-rotate_right_new:
-    ld   a, 0
-    ld   (INPUT_ALLOWED), a
-    call rotate_90_right
-    call draw_map
-    ret
-
-rotate_left_new:
-    ld   a, 0
-    ld   (INPUT_ALLOWED), a
-    call rotate_90_left
-    call draw_map
-    ret
-
-draw_map:
-    ld   de, ATTRS_START
-    ld   hl, MAP
-    ld   b, 16                 ; process 16 rows
-draw_row:
-    push bc
-    ld   bc, 16                 ; process 16 chars in row
-    ldir                        ; draw 1 whole row
-    pop  bc
-
-    push bc
-    ex   de, hl
-    ld   bc, 16
-    adc  hl, bc
-    ex   de, hl                 ; de := next ATTR row
-    pop  bc
-
-    djnz draw_row
-    ret
 
 ; Credit for this must go to Stephen Jones, a programmer who used to
 ; write excellent articles for the Spectrum Discovery Club many years ago.
@@ -235,17 +244,17 @@ ktest1:
 ;; 9 1b 27 00011011   O 1a 26 00011010   L 19 25 00011001  SS 18 24 00011000
 ;; 0 23 35 00100011   P 22 34 00100010  EN 21 33 00100001  SP 20 32 00100000
 
-BALLYX
-    defb 1,2
+HEAD_DIRECTION
+    defb 2                      ; 0=up 1=right 2=down 3=left
+
+HEAD_YX
+    defb 11,15
 
 LAST_FRAME_TIME                 ; last frame counter value
     defb 0
 
-LAST_BALL_FRAME                 ; last frame counter value
+LAST_HEAD_FRAME                 ; last frame counter value
     defb 255
-
-INPUT_ALLOWED
-    defb 1
 
 ; ATTR DISPLAY FILE
 ; 32 WIDE X 24 HIGH = 768 cells
@@ -274,8 +283,6 @@ INPUT_ALLOWED
 ;22 5aa0 .. 5abf
 ;23 5ac0 .. 5adf
 ;24 5ae0 .. 5aff
-
-include rotate.asm
 
 sizeofALL: equ $-init
 

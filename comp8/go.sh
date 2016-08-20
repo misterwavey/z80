@@ -1,4 +1,4 @@
-APP=comp8
+APP=comp8b
 pasmo --tapbas -d $APP.asm $APP.tap $APP.map > $APP.lis
 ret=$?
 if [ "$ret" == 0 ]
