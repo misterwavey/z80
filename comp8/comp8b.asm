@@ -35,7 +35,8 @@ FRAMES                      equ $5C78       ; frame counter 23672d
 ;;
 init:
     ;; set border
-    ld   a, 0                   ; black colour
+    ld   a, 30                   ; black colour
+;    ld   a, 0                   ; black colour
     out  ($fe), a               ; permanent border
 
     ;; clear all attrs to black
@@ -49,6 +50,7 @@ clear_attr:
     or   c                      ; and c both zero
     jr   nz, clear_attr         ; loop to set all attrs to 0
 
+    call draw_border
 ;;
 ;; main loop - no exit
 ;;
@@ -106,7 +108,7 @@ after_direction:
     ld   hl, LAST_HEAD_FRAME
     ld   a, (FRAMES)
     sub  (hl)
-    cp   10                      ; enough frames between head move?
+    cp   10                     ; enough frames between head move?
     jr   nc, move_head          ; yes
     jr   skip_move_head         ; no
 
@@ -127,36 +129,46 @@ move_head:
     ;; fallthrough for 3=left
 
 move_head_left:
-    dec  h                      ; x is in l
+    ld   a, 0
+    cp   h
+    jr   z, skip_move_head      ; already at edge
+    dec  h                      ; x is in h
     jr   draw_head
-
 move_head_up:
-    dec  l                      ; y is in h
+    ld   a, 0
+    cp   l
+    jr   z, skip_move_head      ; already at edge
+    dec  l                      ; y is in l
     jr   draw_head
 
 move_head_right:
-    inc  h                      ; x is in l
+    ld   a, 31
+    cp   h
+    jr   z, skip_move_head      ; already at edge
+    inc  h                      ; x is in h
     jr   draw_head
 
 move_head_down:
-    inc  l                      ; y is in h
+    ld   a, 23
+    cp   l
+    jr   z, skip_move_head      ; already at edge
+    inc  l                      ; y is in l
     ;; fallthrough to draw_head
 
 draw_head:
     ;;
     ;; set head attr colour
     ;;
-    call attribute_at_xy
-    ld   a, 120
-    ld   (de), a
+    call determine_head_colour
+    ld   b, a                   ; hold onto head colour
+    call attribute_at_xy        ; get attr loc for xy
+    ld   a, b                   ; head colour
+    ld   (de), a                ; set attr to head colour
 
     ;;
     ;; save HEAD_YX
     ;;
 
-    ; ld   d, l                   ; swap h/l for saving
-    ; ld   e, h
-    ; ld   (HEAD_YX), de           ; save new position
     ld   (HEAD_YX), hl           ; save new position
 
     ;;
@@ -169,9 +181,68 @@ skip_move_head:
     ;; check for goal
 
     halt
-    jr   game_loop
+    jp   game_loop
 
+;;
+;; end main loops
+;;
 
+;;
+;; in: xy in hl
+;; out: attr val in a
+;;
+determine_head_colour:
+    ld   a, 2
+    cp   h                      ; y < 2?
+    jr   nc, in_border
+    ld   a, 22
+    cp   h
+    jr   c, in_border
+    ld   a, 120
+in_border:
+    ld   a, 20
+    ret
+
+draw_border:
+    ld  hl, ATTRS_START
+    call draw_3_line_border
+    call draw_middle_border
+    ; ld  hl, $5aa0               ; 3 lines from bottom
+    call draw_3_line_border
+    ret
+
+draw_middle_border:
+    ld  b, 20
+next_middle_row:
+    push bc
+    ld   (hl), a                ; draw 3 left side border
+    inc  hl
+    ld   (hl), a
+    ld   bc, 29
+    add  hl, bc
+    ld   (hl), a                ; draw 3 right side border
+    inc  hl
+    ld   (hl), a
+    inc  hl
+    pop  bc
+    djnz next_middle_row
+    ret
+
+;; hl points to attr addr to begin drawing
+draw_3_line_border:
+    ld  a, 127
+    ld  b, 2                    ; 3 rows
+draw_row:
+    push bc
+    ld   b, 32                  ; 32 cells per row
+draw_cell:
+    ld  (hl), a
+    inc  hl
+    djnz draw_cell
+
+    pop  bc
+    djnz draw_row
+    ret
 ;;
 ;; set attribute address in de (attribute in a) given
 ;; character position (x,y) in hl
@@ -195,8 +266,7 @@ attribute_at_xy:
     ld   e, a                   ; de=address of attributes.
     ld   a, (de)                ; return with attribute in accumulator.
     pop  hl
-    ret
-
+    ret robo
 
 ; Credit for this must go to Stephen Jones, a programmer who used to
 ; write excellent articles for the Spectrum Discovery Club many years ago.
