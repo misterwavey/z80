@@ -59,7 +59,6 @@ game_loop:
     ;;
     ;; check input
     ;;
-
     ld   a, $1a                 ; 'o' 26d
     call ktest
     jp   nc, direction_left     ; handle if pressed
@@ -75,11 +74,10 @@ game_loop:
     ld   a, $26                 ; 'a' 38d
     call ktest
     jp   nc, direction_down     ; handle if pressed
-
     jr   after_direction        ; no input. don't change direction
 
     ;;
-    ;; change direction
+    ;; change direction based on input
     ;;
 direction_left:
     ld  a, 3
@@ -129,48 +127,34 @@ move_head:
     ;; fallthrough for 3=left
 
 move_head_left:
-    ld   a, 0
-    cp   h
-    jr   z, skip_move_head      ; already at edge
-    dec  h                      ; x is in h
-    jr   draw_head
+    ld   a, 0                   ; already at edge?
+    cp   h                      ; x is in h
+    jr   z, skip_move_head      ; skip if so
+    dec  h
+    jr   save_head
 move_head_up:
-    ld   a, 0
-    cp   l
-    jr   z, skip_move_head      ; already at edge
-    dec  l                      ; y is in l
-    jr   draw_head
-
+    ld   a, 0                   ; already at edge?
+    cp   l                      ; y is in l
+    jr   z, skip_move_head      ; skip if so
+    dec  l
+    jr   save_head
 move_head_right:
-    ld   a, 31
-    cp   h
-    jr   z, skip_move_head      ; already at edge
-    inc  h                      ; x is in h
-    jr   draw_head
-
+    ld   a, 31                  ; already at edge?
+    cp   h                      ; x is in h
+    jr   z, skip_move_head      ; skip if so
+    inc  h
+    jr   save_head
 move_head_down:
-    ld   a, 23
-    cp   l
-    jr   z, skip_move_head      ; already at edge
-    inc  l                      ; y is in l
-    ;; fallthrough to draw_head
-
-draw_head:
-    ;;
-    ;; set head attr colour
-    ;;
-    call determine_head_colour
-    ld   b, a                   ; hold onto head colour
-    call attribute_at_xy        ; get attr loc for xy
-    ld   a, b                   ; head colour
-    ld   (de), a                ; set attr to head colour
-
+    ld   a, 23                  ; already at edge?
+    cp   l                      ; y is in l
+    jr   z, skip_move_head      ; skip if so
+    inc  l
+    ;; fallthrough to save_head
+save_head:
     ;;
     ;; save HEAD_YX
     ;;
-
     ld   (HEAD_YX), hl           ; save new position
-
     ;;
     ;; reset frame count for head timer
     ;;
@@ -181,26 +165,70 @@ skip_move_head:
     ;; check for goal
 
     halt
+    push hl
+    call animate
+    pop  hl
+    call draw_head
     jp   game_loop
 
 ;;
 ;; end main loops
 ;;
 
+draw_head:
+    ;;
+    ;; set head attr colour
+    ;;
+    call determine_head_colour
+    ld   b, a                   ; hold onto head colour
+    call attribute_at_xy        ; get attr loc for xy in hl
+    ld   a, b                   ; head colour
+    ld   (de), a                ; set attr to head colour
+    ret
+
+animate:
+    ld   hl, HEAD_ANIMATE_FRAMES
+    ld   a, (FRAMES)            ; current timer setting.
+    sub  (hl)
+    cp   15
+    jp   c, skip_animate
+    ld   a, (HEAD_ANIMATE_COUNT)
+    inc  a                      ; move to next animation setting
+    cp   4
+    jr   z, reset_head_animate_head_count
+    jr   save_animate
+reset_head_animate_head_count:
+    ld   a, 0
+save_animate:
+    ld   (HEAD_ANIMATE_COUNT), a
+skip_animate:
+    ret
+
 ;;
 ;; in: xy in hl
 ;; out: attr val in a
 ;;
 determine_head_colour:
-    ld   a, 2
-    cp   h                      ; y < 2?
-    jr   nc, in_border
-    ld   a, 22
-    cp   h
-    jr   c, in_border
-    ld   a, 120
-in_border:
-    ld   a, 20
+    ld   a, (HEAD_ANIMATE_COUNT)
+    cp   0
+    jr   z, head_animate_0
+    cp   1
+    jr   z, head_animate_1
+    cp   2
+    jr   z, head_animate_2
+    ;; otherwise value is 3
+    ld   a, 8*3
+    jr   end_head_colour
+head_animate_0:
+    ld   a, 8*1
+    jr   end_head_colour
+head_animate_1:
+    ld   a, 8*4
+    jr   end_head_colour
+head_animate_2:
+    ld   a, 8*6
+    ;; fallthrough
+end_head_colour:
     ret
 
 draw_border:
@@ -317,8 +345,14 @@ ktest1:
 HEAD_DIRECTION
     defb 2                      ; 0=up 1=right 2=down 3=left
 
+HEAD_ANIMATE_FRAMES
+    defb 0
+
+HEAD_ANIMATE_COUNT
+    defb 0
+
 HEAD_YX
-    defb 11,15
+    defb 23,15
 
 LAST_FRAME_TIME                 ; last frame counter value
     defb 0
