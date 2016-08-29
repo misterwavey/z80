@@ -61,19 +61,19 @@ game_loop:
     ;;
     ld   a, $1a                 ; 'o' 26d
     call ktest
-    jp   nc, direction_left     ; handle if pressed
+    jr   nc, direction_left     ; handle if pressed
 
     ld   a, $22                 ; 'p' 34d
     call ktest
-    jp   nc, direction_right    ; handle if pressed
+    jr   nc, direction_right    ; handle if pressed
 
     ld   a, $25                 ; 'q' 37d
     call ktest
-    jp   nc, direction_up       ; handle if pressed
+    jr   nc, direction_up       ; handle if pressed
 
     ld   a, $26                 ; 'a' 38d
     call ktest
-    jp   nc, direction_down     ; handle if pressed
+    jr   nc, direction_down     ; handle if pressed
     jr   after_direction        ; no input. don't change direction
 
     ;;
@@ -83,17 +83,14 @@ direction_left:
     ld  a, 3
     ld  (HEAD_DIRECTION), a
     jr  after_direction
-
 direction_right:
     ld  a, 1
     ld  (HEAD_DIRECTION), a
     jr  after_direction
-
 direction_up:
     ld  a, 0
     ld  (HEAD_DIRECTION), a
     jr  after_direction
-
 direction_down:
     ld  a, 2
     ld  (HEAD_DIRECTION), a
@@ -106,7 +103,7 @@ after_direction:
     ld   hl, LAST_HEAD_FRAME
     ld   a, (FRAMES)
     sub  (hl)
-    cp   10                     ; enough frames between head move?
+    cp   2                    ; enough frames between head move?
     jr   nc, move_head          ; yes
     jr   skip_move_head         ; no
 
@@ -125,32 +122,35 @@ move_head:
     cp   2
     jr   z, move_head_down
     ;; fallthrough for 3=left
-
 move_head_left:
     ld   a, 0                   ; already at edge?
     cp   h                      ; x is in h
     jr   z, skip_move_head      ; skip if so
+    ld   (PREV_HEAD_YX), hl
     dec  h
-    jr   save_head
+    jr   save_head_pos
 move_head_up:
     ld   a, 0                   ; already at edge?
     cp   l                      ; y is in l
     jr   z, skip_move_head      ; skip if so
+    ld   (PREV_HEAD_YX), hl
     dec  l
-    jr   save_head
+    jr   save_head_pos
 move_head_right:
     ld   a, 31                  ; already at edge?
     cp   h                      ; x is in h
     jr   z, skip_move_head      ; skip if so
+    ld   (PREV_HEAD_YX), hl
     inc  h
-    jr   save_head
+    jr   save_head_pos
 move_head_down:
     ld   a, 23                  ; already at edge?
     cp   l                      ; y is in l
     jr   z, skip_move_head      ; skip if so
+    ld   (PREV_HEAD_YX), hl
     inc  l
     ;; fallthrough to save_head
-save_head:
+save_head_pos:
     ;;
     ;; save HEAD_YX
     ;;
@@ -165,33 +165,40 @@ skip_move_head:
     ;; check for goal
 
     halt
-    push hl
+    call erase_old
     call animate
-    pop  hl
-    call draw_head
     jp   game_loop
 
 ;;
 ;; end main loops
 ;;
 
-draw_head:
-    ;;
-    ;; set head attr colour
-    ;;
-    call determine_head_colour
-    ld   b, a                   ; hold onto head colour
-    call attribute_at_xy        ; get attr loc for xy in hl
-    ld   a, b                   ; head colour
-    ld   (de), a                ; set attr to head colour
+erase_old:
+    ld   hl, PREV_HEAD_YX
+    ld   a, (hl)
+    cp   $ff
+    jr   z, erase_done          ; no previous move to recolour
+    ld   e, a                   ; put yx coords in de
+    inc  hl
+    ld   d, (hl)
+    ex   de, hl                 ; put yx coords in hl
+    call attribute_at_xy        ; get xy
+    ld   a, 127
+    ld   (de), a
+    ld   a, $ff
+    ld   (PREV_HEAD_YX), a      ; marker value for skip
+erase_done:
     ret
 
 animate:
+    push hl
     ld   hl, HEAD_ANIMATE_FRAMES
     ld   a, (FRAMES)            ; current timer setting.
     sub  (hl)
-    cp   15
-    jp   c, skip_animate
+    cp   10
+    jr   nc, do_animate
+    jr   skip_animate
+do_animate:
     ld   a, (HEAD_ANIMATE_COUNT)
     inc  a                      ; move to next animation setting
     cp   4
@@ -202,8 +209,24 @@ reset_head_animate_head_count:
 save_animate:
     ld   (HEAD_ANIMATE_COUNT), a
 skip_animate:
-    ret
+    pop  hl
+;; fallthrough
+draw_head:
+    ;;
+    ;; set head attr colour
+    ;;
+    call determine_head_colour
+    ld   b, a                   ; hold onto head colour
+    ld   hl, HEAD_YX
+    ld   e, (hl)                ; put yx coords in de
+    inc  hl
+    ld   d, (hl)
+    ex   de, hl                 ; put yx coords in hl
 
+    call attribute_at_xy        ; de := attr loc for xy in hl
+    ld   a, b                   ; head colour
+    ld   (de), a                ; set attr to head colour
+    ret
 ;;
 ;; in: xy in hl
 ;; out: attr val in a
@@ -235,7 +258,6 @@ draw_border:
     ld  hl, ATTRS_START
     call draw_3_line_border
     call draw_middle_border
-    ; ld  hl, $5aa0               ; 3 lines from bottom
     call draw_3_line_border
     ret
 
@@ -294,7 +316,7 @@ attribute_at_xy:
     ld   e, a                   ; de=address of attributes.
     ld   a, (de)                ; return with attribute in accumulator.
     pop  hl
-    ret robo
+    ret
 
 ; Credit for this must go to Stephen Jones, a programmer who used to
 ; write excellent articles for the Spectrum Discovery Club many years ago.
@@ -322,11 +344,11 @@ ktest:
 ktest0:
     rrca                        ; rotate into position.
     djnz ktest0                 ; repeat until we've found relevant row.
-    in    a, ($FE)              ; read port (a=high, 254=low).
+    in   a, ($FE)               ; read port (a=high, 254=low).
 ktest1:
     rra                         ; rotate bit out of result.
-    dec   c                     ; loop counter.
-    jp    nz, ktest1            ; repeat until bit for position in carry.
+    dec  c                      ; loop counter.
+    jp   nz, ktest1             ; repeat until bit for position in carry.
     ret
 
 ;; KEY_SCAN key codes: hex, decimal, binary
@@ -359,6 +381,12 @@ LAST_FRAME_TIME                 ; last frame counter value
 
 LAST_HEAD_FRAME                 ; last frame counter value
     defb 255
+
+PREV_HEAD_YX                    ; if byte 0 is $ff then it is unset
+    defb $ff,0
+
+MOVEMENT_ARRAY                  ; byte 0 and 1 are initial xy. then direction bytes
+    defs 100,0
 
 ; ATTR DISPLAY FILE
 ; 32 WIDE X 24 HIGH = 768 cells
