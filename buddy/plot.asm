@@ -5,6 +5,7 @@ org 38000
 PIXELS_START    equ     $4000   ; 16384d
 ATTRS_START     equ     $5800   ; 22528d
 TIMER           equ     23672d  ; used for random seed
+BORDER: defb 0
 
 init:
         ld   a, 7               ; black colour
@@ -31,94 +32,54 @@ done_wait_input:
         ld a, (TIMER)           ; current timer.
         ld (SEED), a            ; set first byte of random seed.
 
+        ; call show_all_bytes
+        call scroll_screen_draw_star
+        ret
+
 scroll_screen_draw_star:
-        ; ld a, 7d
-        ; ld c, 2d
-        ; call Divide
-        ; ld c, a
-        ; ld b, 0
-        ; ret
 
         ; draw random star on bottom row
-        ld b, 191d              ; 191d = bottom row of screen address
-        call random             ; get random byte 0-255d
-        ld c, a                 ; store random as x pos. bc is now xy
-        call plot_buffer        ; plot point at xy
+        ld b, 255d                  ; x (0-255d)
 
-        ; call populate_buffer
+        ; call random             ; get random byte 0-255d
+        ; ld b, a                 ; store random as x pos. bc is now xy
 
-        ; scroll buffer up one pixel row
-        ld bc, 6144d - 256d     ; include all rows except first one
-        ld hl, BUFFER + 256d    ; src:  start at 2nd row
-        ld de, BUFFER           ; dest: start at 1st row
-        ldir
+        ;tmp fix star y
+        ld c, 0d                  ; y (0-191d)
 
-        ; blank bottom pixel row
-        ld bc, 256d                  ; count whole row
-        ld hl, BUFFER + 6114d - 256d ; start of bottom pixel row
-        ld (hl), 0                   ; blank pixel
-        ld de, BUFFER + 6114d - 255d ; start of bottom row + 1
-        ldir
+        call plot_buffer          ; plot point at xy
 
-        call restore_buffer
+        ; ; scroll buffer up one pixel row
+        ; ld bc, 6144d - 255d     ; include all rows except first one
+        ; ld hl, BUFFER + 255d    ; src:  start at 2nd row
+        ; ld de, BUFFER           ; dest: start at 1st row
+        ; ldir
+        ;
+        ; ; blank bottom pixel row
+        ; ld bc, 256d                  ; count whole row
+        ; ld hl, BUFFER + 6114d - 256d ; start of bottom pixel row
+        ; ld (hl), 0                   ; blank pixel
+        ; ld de, BUFFER + 6114d - 255d ; start of bottom row + 1
+        ; ldir
+
+        call paste_buffer
 
         ld bc, $ffff
         call delay
 
+;
         jr scroll_screen_draw_star
-
-;         ld b, 191d            ; 191d = bottom row of screen address
-; fill_random:
-;         call random             ; get random byte 0-255d
-;         ld c, a                 ; store random as x pos
-;         dec b                   ; next row up as y pos
-;         call plot               ; plot point at xy
-;         ;halt
-;         ld a, b                 ; finished all rows?
-;         cp 0
-;         jr nz, fill_random      ; no
-;         ret                     ; yes
-;;
-;; sub
-;; find pixel address
-;; b = y coord, c = x coord
-;; hl <- address
-;; a <- pixel number
-;;
-pixadd:
-        ld a, b
-        rra
-        scf
-        rra
-        rra
-        and 58h
-        ld h, a
-        ld a, b
-        and 7
-        add a, h
-        ld h, a
-        ld a, c
-        rrca
-        rrca
-        rrca
-        and 1fh
-        ld l, a
-        ld a, b
-        and 38h
-        add a, a
-        add a, a
-        or l
-        ld l, a
-        ld a, c
-        and 7
         ret
 
 ;; sub
 ;; bc = xy
 ;; plot xy on buffer
 plot_buffer:
-        ld e, c                 ; e holds y
+        push de
+        push hl
+
         ld a, b                 ; a holds x
+        ld e, c                 ; e holds y
 
         ld c, 08d               ; find which 0-31 char x fits into
         call Divide             ; b:=a/c b:=x/8 b:= char a:=remainder
@@ -126,7 +87,7 @@ plot_buffer:
 
         push bc                 ; store x charpos, pixel offset
         ld d, 0                 ; de holds y
-        ld bc, 191d             ; calc 191 * y
+        ld bc, 32d              ; calc 32 bytes * y
         call Mul16
         ld de, BUFFER           ; start of buffer
         add hl, de              ; plus result of 191*y (already in hl)
@@ -138,12 +99,16 @@ plot_buffer:
         pop bc                  ; x charpos in b, pixel offset in c
 
         ld b, c                 ; b = pixel offset
-        ld a, 1                 ; set pixel
+        inc b
+        ld a, 1               ; set pixel
 plot_pix:
         rrca                    ; rotate to pixel offset count
         djnz plot_pix           ; done?
         xor (hl)                ; flip pixel
         ld (hl), a              ; set byte at address
+
+        pop hl
+        pop de
         ret
 
 ;; sub
@@ -183,27 +148,11 @@ NoMul16:
         jp nz,Mul16Loop
         ret
 
-;;
-;; sub
-;;
-plot:
-        push bc                 ; save xy
-        call pixadd             ; convert xy to screen address byte in hl
-        ld b, a                 ; store pixel offset count
-        inc b                   ; increase by 1
-        ld a, 1                 ; set pixel
-pix:
-        rrca                    ; rotate to pixel offset count
-        djnz pix                ; done?
-        xor (hl)                ; merge a with current pixel byte
-        ld (hl), a              ; update byte at address
-        pop bc                  ; restore xy
-        ret
-
 ; Simple pseudo-random number generator.
 ; Steps a pointer through the ROM (held in seed), returning
 ; the contents of the byte at that location.
 ; a <- random byte
+; trashes hl, a
 
 random:
         ld hl,(SEED)            ; Pointer
@@ -275,7 +224,11 @@ l2:
 
 ; sub
 ; restore BUFFER to D/File
-restore_buffer:
+paste_buffer:
+        push hl
+        push de
+        push bc
+
         ld hl, PIXELS_START
         ld de, BUFFER
         ld c, $c0
@@ -307,6 +260,9 @@ r1:
 r2:
         dec c
         jr nz, r0
+        pop bc
+        pop de
+        pop hl
         ret
 
 ; sub
@@ -317,6 +273,88 @@ delay:
         or c
         jr nz, delay
         ret
+
+show_all_bytes:
+        ld hl, BUFFER
+        ld bc, 6144d
+show_l1:
+        ld (hl), $ff
+        call paste_buffer
+    ;     ld   a, BORDER               ; black colour
+    ;     out  ($fe), a           ; permanent border
+    ;     inc a
+    ;     cp 8
+    ;     jr nz, skip_reset_border
+    ;     ld a, 0
+    ; skip_reset_border:
+    ;     ld (BORDER), a
+
+        ld (hl), 0
+
+        inc hl
+        dec bc
+        ld a, b
+        or c
+        jr nz, show_l1
+
+; loop forever to observe pixel test
+za:
+        jr za
+;; end loop
+
+;;
+;; sub
+;; find pixel address
+;; b = y coord, c = x coord
+;; hl <- address
+;; a <- pixel number
+;;
+pixadd:
+        ld a, b
+        rra
+        scf
+        rra
+        rra
+        and 58h
+        ld h, a
+        ld a, b
+        and 7
+        add a, h
+        ld h, a
+        ld a, c
+        rrca
+        rrca
+        rrca
+        and 1fh
+        ld l, a
+        ld a, b
+        and 38h
+        add a, a
+        add a, a
+        or l
+        ld l, a
+        ld a, c
+        and 7
+        ret
+
+;;
+;; sub
+;;
+plot:
+        push bc                 ; save xy
+        call pixadd             ; convert xy to screen address byte in hl
+        ld b, a                 ; store pixel offset count
+        inc b                   ; increase by 1
+        ld a, 1                 ; set pixel
+pix:
+        rrca                    ; rotate to pixel offset count
+        djnz pix                ; done?
+        xor (hl)                ; merge a with current pixel byte
+        ld (hl), a              ; update byte at address
+        pop bc                  ; restore xy
+        ret
+
+
 
 SEED:
         defw    0               ; current seed value
