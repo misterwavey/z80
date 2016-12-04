@@ -5,10 +5,16 @@ org 38000
 PIXELS_START    equ     $4000   ; 16384d
 ATTRS_START     equ     $5800   ; 22528d
 TIMER           equ     23672d  ; used for random seed
-BORDER: defb 0
+
+BORDER:
+        defb    0
+SEED:
+        defw    0               ; current seed value
+LAST_STAR_X:
+        defb    0
 
 init:
-        ld   a, 7               ; black colour
+        ld   a, 0               ; black colour
         out  ($fe), a           ; permanent border
         ;; clear all attrs to black
 
@@ -38,36 +44,40 @@ done_wait_input:
 
 scroll_screen_draw_star:
 
-        ; draw random star on bottom row
-        ld b, 255d                  ; x (0-255d)
+        ; scroll buffer up one pixel row
+        ld bc, 6144d - 32d     ; include all rows except first one
+        ld hl, BUFFER + 32d    ; src:  start at 2nd row
+        ld de, BUFFER          ; dest: start at 1st row
+        ldir
 
-        ; call random             ; get random byte 0-255d
-        ; ld b, a                 ; store random as x pos. bc is now xy
+        ; ld bc, $ffff
+        ; call delay
+;
+        ; blank bottom pixel row
+        ld bc, 32d                  ; count whole row
+        ld hl, BUFFER + 6144d - 32d ; start of bottom pixel row
+        ld (hl), 0                  ; blank pixel
+        ld de, BUFFER + 6144d - 31d ; start of bottom row + 1
+        ldir
+
+gen_random_star:
+        ; draw random star on bottom row
+        call random             ; get random byte 0-255d
+        ld b, a                 ; store random as x pos. bc is now xy
+        ld a, (LAST_STAR_X)
+        cp b                    ; big enough difference from last time?
+        jr z, gen_random_star ; < 10 different from last star position
+got_star:
+        ld hl, LAST_STAR_X              ; save original random value as LAST_STAR_X
+        ld (hl), b
 
         ;tmp fix star y
-        ld c, 0d                  ; y (0-191d)
+        ld c, 191d                  ; y (0-191d)
 
         call plot_buffer          ; plot point at xy
 
-        ; ; scroll buffer up one pixel row
-        ; ld bc, 6144d - 255d     ; include all rows except first one
-        ; ld hl, BUFFER + 255d    ; src:  start at 2nd row
-        ; ld de, BUFFER           ; dest: start at 1st row
-        ; ldir
-        ;
-        ; ; blank bottom pixel row
-        ; ld bc, 256d                  ; count whole row
-        ; ld hl, BUFFER + 6114d - 256d ; start of bottom pixel row
-        ; ld (hl), 0                   ; blank pixel
-        ; ld de, BUFFER + 6114d - 255d ; start of bottom row + 1
-        ; ldir
-
         call paste_buffer
 
-        ld bc, $ffff
-        call delay
-
-;
         jr scroll_screen_draw_star
         ret
 
@@ -160,6 +170,7 @@ random:
         and 31                  ; keep it within first 8k of ROM.
         ld h, a
         ld a, (hl)              ; Get "random" number from location.
+        xor l
         inc hl                  ; Increment pointer.
         ld (SEED), hl
         ret
@@ -356,8 +367,6 @@ pix:
 
 
 
-SEED:
-        defw    0               ; current seed value
 BUFFER:
         defs 6144d          ; offscreen  buffer 6144 bytes big
 

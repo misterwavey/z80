@@ -103,7 +103,7 @@ after_direction:
     ld   hl, LAST_HEAD_FRAME
     ld   a, (FRAMES)
     sub  (hl)
-    cp   2                    ; enough frames between head move?
+    cp   2                      ; enough frames between head move?
     jr   nc, move_head          ; yes
     jr   skip_move_head         ; no
 
@@ -120,7 +120,7 @@ move_head:
     cp   1
     jr   z, move_head_right
     cp   2
-    jr   z, move_head_down
+    jr   z, move_head_down      ; initial direction
     ;; fallthrough for 3=left
 move_head_left:
     ld   a, 0                   ; already at edge?
@@ -165,7 +165,7 @@ skip_move_head:
     ;; check for goal
 
     halt
-    call erase_old
+    call process_tail
     call animate
     jp   game_loop
 
@@ -173,21 +173,45 @@ skip_move_head:
 ;; end main loops
 ;;
 
-erase_old:
-    ld   hl, PREV_HEAD_YX
+process_tail:
+    ld   hl, PREV_HEAD_YX       ; have we got a tail to colour?
     ld   a, (hl)
     cp   $ff
-    jr   z, erase_done          ; no previous move to recolour
-    ld   e, a                   ; put yx coords in de
+    jr   z, tail_done           ; no previous move to recolour
+    ;; colour prev head
+    ld   e, a                   ; put last head position yx coords in de
     inc  hl
     ld   d, (hl)
     ex   de, hl                 ; put yx coords in hl
-    call attribute_at_xy        ; get xy
-    ld   a, 127
+    call attribute_at_xy        ; a := attr colour
+    cp   127                    ; is prev head attr already coloured?
+    jp   z, white_attr          ; yes check for completed box
+
+    ld   a, 7                   ; white colour
+    out  ($fe), a               ; permanent border
+
+    ld   a, 127                 ; no so make white
     ld   (de), a
-    ld   a, $ff
-    ld   (PREV_HEAD_YX), a      ; marker value for skip
-erase_done:
+    ; ld   a, $ff
+    ; ld   (PREV_HEAD_YX), a      ; marker value for skip
+
+    ld   a, 1
+    ld   (LINE_IN_PROGRESS), a  ; indicate we're now drawing a line
+    jp   tail_done
+white_attr:
+    ld   a, (LINE_IN_PROGRESS)
+    cp   0
+    jp   z, tail_done          ; we're not doing a new line yet
+    ld   a, 0                   ; we've now finished a line
+    ld   (LINE_IN_PROGRESS), a  ; store marker
+    call fill_region
+tail_done:
+    ret
+
+fill_region:
+    ;; set border
+    ld   a, 2                   ; red colour
+    out  ($fe), a               ; permanent border
     ret
 
 animate:
@@ -384,6 +408,9 @@ LAST_HEAD_FRAME                 ; last frame counter value
 
 PREV_HEAD_YX                    ; if byte 0 is $ff then it is unset
     defb $ff,0
+
+LINE_IN_PROGRESS
+    defb 0
 
 MOVEMENT_ARRAY                  ; byte 0 and 1 are initial xy. then direction bytes
     defs 100,0
