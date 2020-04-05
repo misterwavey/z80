@@ -41,39 +41,41 @@ AppStart                equ *                           ;
 
                         ld hl, COMTAIL$COUNT            ; check comtail for arguments
                         ld a, (hl)                      ;
-                        ld c, a                         ; copy length for later
+                        ld c, a                         ; (copy length for later)
                         CP 0                            ; length == 0?
                         JP z, NoArgs                    ; yes
 
-CheckArgs               ld de, COMTAIL$CHARS-1          ; skip leading spaces
+CheckArgs               ld de, COMTAIL$CHARS-1          ; skip any leading spaces
 SkipLeadingSpaces       inc de                          ;
                         ld a, (de)                      ;
                         cp a, ' '                       ;
                         jp z, SkipLeadingSpaces         ;
-                        ld hl, CMDBUFF                  ; populate cmdbuf with comtail until next space
-CopyUntilSpaceOrMax     ld (hl), a                      ; add char to cmdbuf[hl]
+                        ld hl, CMDBUFF                  ; now populate cmdbuf with comtail until next space (or count chars)
+
+CopyUntilSpaceOrMax     ld (hl), a                      ; add current comtail char to cmdbuf[hl]
                         inc hl                          ;
-                        push hl                         ; store
-                        push bc                         ;
-                        ld bc, COMTAIL$CHARS            ;
+                        push hl                         ; about to trash
+                        push bc                         ; about to trash
+                        ld bc, COMTAIL$CHARS            ; only proceed until we've exhaused char count
                         ld hl, de                       ;
-                        or a                            ; clear carry for next op
-                        sbc hl, bc                      ; hl = hl - bc
+                        or a                            ; clear carry for sbc
+                        sbc hl, bc                      ; hl = hl - bc = how many chars we've processed
                         ld a, l                         ; a = low byte of hl
                         ld hl, COMTAIL$COUNT            ;
-                        ld b, (hl)                      ;
-                        cp b                            ;   z = a - b
+                        ld b, (hl)                      ; b = comtail char count
+                        cp b                            ; is comtail char count same as our process char count?
                         pop bc                          ;
                         pop hl                          ;
-                        jp z, FinaliseCmd               ; a = size diff
-                        inc de                          ;
+                        jp z, FinaliseCmd               ; bail if we've met the char count
+                        inc de                          ; otherwise continue untli we see a space
                         ld a, (de)                      ;
                         cp a, ' '                       ;
                         jp nz, CopyUntilSpaceOrMax      ;
+
 FinaliseCmd             ld a, '$'                       ; $ terminate cmdbuf
                         ld (hl), a                      ;
 
-                        ld C, B$PRINTS                  ;
+                        ld C, B$PRINTS                  ; print first token
                         ld DE, CMDBUFF                  ;
                         CALL CPM_CMD                    ;
                         RET                             ; RETURN TO THE CCP
