@@ -1,4 +1,4 @@
-                        ; An example CP/M application
+; standard zeus CP/M setup
 
 Zeus_cpm_drives         = "cpm_disks.bin"               ; Tell Zeus where the CP/M virtual disks are stored
 
@@ -16,9 +16,14 @@ Zeus_cpm_drives         = "cpm_disks.bin"               ; Tell Zeus where the CP
                         org $5                          ;
 BDOS_CMD                jp FBASE                        ; The CP/M command entry point
 
-; Build the CP/M application here.
 
-;
+; * * * * * * * * * * * * * * * *
+; *                             *
+; * start of JOURNAL.COM source *
+; *                             *
+; * * * * * * * * * * * * * * * *
+
+
 ; parse args (add/list) (entry)
 ; if add
 ;     open file
@@ -41,7 +46,6 @@ AppStart                equ *                           ;
 
                         ld hl, COMTAIL_COUNT            ; check comtail for arguments
                         ld a, (hl)                      ;
-                        ld c, a                         ; (copy length for later)
                         CP 0                            ; length == 0?
                         JP z, NoArgs                    ; yes
 
@@ -51,11 +55,9 @@ SkipLeadingSpaces       inc de                          ;
                         cp a, ' '                       ;
                         jp z, SkipLeadingSpaces         ;
                         ld hl, CMDBUFF                  ; now populate cmdbuf with comtail until next space (or count chars)
-
 CopyUntilSpaceOrMax     ld (hl), a                      ; add current comtail char to cmdbuf[hl]
                         inc hl                          ;
                         push hl                         ; about to trash
-                        push bc                         ; about to trash
                         ld bc, COMTAIL_CHARS            ; only proceed until we've exhaused char count
                         ld hl, de                       ;
                         or a                            ; clear carry for sbc
@@ -64,17 +66,30 @@ CopyUntilSpaceOrMax     ld (hl), a                      ; add current comtail ch
                         ld hl, COMTAIL_COUNT            ;
                         ld b, (hl)                      ; b = comtail char count
                         cp b                            ; is comtail char count same as our process char count?
-                        pop bc                          ;
                         pop hl                          ;
-                        jp z, FinaliseCmd               ; bail if we've met the char count
+                        jp z, ShowToken                 ; bail if we've met the char count
                         inc de                          ; otherwise continue untli we see a space
                         ld a, (de)                      ;
                         cp a, ' '                       ;
                         jp nz, CopyUntilSpaceOrMax      ;
 
-FinaliseCmd             ld a, '$'                       ; $ terminate cmdbuf
-                        ld (hl), a                      ;
+/*CheckCmdToken           inc de                          ; de = remainder of comtail
+                        push bc
+                        push de                         ;
+                        ld c, 0
+                        ld hl, CMDBUFF-1                  ; start of command
+                        ld de, CMD_ADD-1                  ; start of add command
+CheckNextChar           inc hl
+                        inc de
+                        ld b, (hl)
+                        ld a, (de)
+                        cp b
+                        jp z, CheckNextChar
 
+*/
+
+ShowToken               ld a, '$'                       ; $ terminate cmdbuf
+                        ld (hl), a                      ;
                         ld C, B_PRINTS                  ; print first token
                         ld DE, CMDBUFF                  ;
                         CALL BDOS_CMD                   ;
@@ -93,11 +108,15 @@ NO_ARGS                 defb "usage: journal list|add [new journal entry text]$"
 CMDBUFF                 defs $127                       ; copy of the command entered
 AppEnd                  equ *                           ; We'll need to know how long the application is.
 
+; * * * * * * * * * * * * * * *
+; *                           *
+; * end of JOURNAL.COM source *
+; *                           *
+; * * * * * * * * * * * * * * *
 
-                        output_cpm "A:JOURNAL.COM",AppStart,AppEnd-AppStart;
+
 ; Save this application as a CP/M file
-
-;                        output_cpm "A:H.COM",AppStart,AppEnd-AppStart
+                        output_cpm "A:JOURNAL.COM",AppStart,AppEnd-AppStart;
 
 ; Now, we'll also include and build the CP/M source files while we're at it, so they can be single-stepped
 
@@ -132,13 +151,8 @@ AppEnd                  equ *                           ; We'll need to know how
                         zeussyntaxhighlight 6, $FF,$00,$FF ; Set the error colour
                         zeussyntaxhighlight 7, $ff,$FF,$FF ; Set the margin data colour
 
-                        zeussyntaxhighlight 100, $00,$FF,$FF ; Diana background
-                        zeussyntaxhighlight 101, $00,$ff,$00 ; Diana foreground
-                        zeussyntaxhighlight 102, $FF,$FF,$FF ; Diana defn background
-                        zeussyntaxhighlight 103, $00,$00,$A0 ; Diana defn foreground
-
                         zeussyntaxhighlight 249, $00,$00,$A0 ; Set the "marked line" colour. [not used in this version]
-                        zeussyntaxhighlight 250, $ff,$00,$ff ; Set the margin separator line colour
+                        zeussyntaxhighlight 250, $ff,$ff,$00 ; Set the margin separator line colour
                         zeussyntaxhighlight 251, $00,$00,$C8 ; Set the margin separator line2 colour
                         zeussyntaxhighlight 252, $22,$22,$00 ; Set the current executing line background colour
                         zeussyntaxhighlight 253, $22,$22,$aa ; Set the current editing line background colour
