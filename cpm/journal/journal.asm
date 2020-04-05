@@ -14,7 +14,7 @@ Zeus_cpm_drives         = "cpm_disks.bin"               ; Tell Zeus where the CP
 
 ; This jump is the CP/M API entry point, we include it in the source so Zeus will show it when single-stepping
                         org $5                          ;
-CPM_CMD                 jp FBASE                        ; The CP/M command entry point
+BDOS_CMD                jp FBASE                        ; The CP/M command entry point
 
 ; Build the CP/M application here.
 
@@ -30,22 +30,22 @@ CPM_CMD                 jp FBASE                        ; The CP/M command entry
 ;      close?
 ; else error
 ;
-COMTAIL$COUNT           equ $0080                       ; our command's argument list length
-COMTAIL$CHARS           equ $0081                       ; our command's argument list contents
+COMTAIL_COUNT           equ $0080                       ; our command's argument list length
+COMTAIL_CHARS           equ $0081                       ; our command's argument list contents
 
-B$CONOUT                equ 2                           ; BDOS FN 2 - wite byte to console
-B$PRINTS                equ 9                           ; BDOS FN 9 - write $ terminated string to console
+B_CONOUT                equ 2                           ; BDOS FN 2 - wite byte to console
+B_PRINTS                equ 9                           ; BDOS FN 9 - write $ terminated string to console
 
 ORG                     $100                            ; TRANSIENT PROGRAM AREA
 AppStart                equ *                           ;
 
-                        ld hl, COMTAIL$COUNT            ; check comtail for arguments
+                        ld hl, COMTAIL_COUNT            ; check comtail for arguments
                         ld a, (hl)                      ;
                         ld c, a                         ; (copy length for later)
                         CP 0                            ; length == 0?
                         JP z, NoArgs                    ; yes
 
-CheckArgs               ld de, COMTAIL$CHARS-1          ; skip any leading spaces
+CheckArgs               ld de, COMTAIL_CHARS-1          ; skip any leading spaces
 SkipLeadingSpaces       inc de                          ;
                         ld a, (de)                      ;
                         cp a, ' '                       ;
@@ -56,12 +56,12 @@ CopyUntilSpaceOrMax     ld (hl), a                      ; add current comtail ch
                         inc hl                          ;
                         push hl                         ; about to trash
                         push bc                         ; about to trash
-                        ld bc, COMTAIL$CHARS            ; only proceed until we've exhaused char count
+                        ld bc, COMTAIL_CHARS            ; only proceed until we've exhaused char count
                         ld hl, de                       ;
                         or a                            ; clear carry for sbc
                         sbc hl, bc                      ; hl = hl - bc = how many chars we've processed
                         ld a, l                         ; a = low byte of hl
-                        ld hl, COMTAIL$COUNT            ;
+                        ld hl, COMTAIL_COUNT            ;
                         ld b, (hl)                      ; b = comtail char count
                         cp b                            ; is comtail char count same as our process char count?
                         pop bc                          ;
@@ -75,31 +75,14 @@ CopyUntilSpaceOrMax     ld (hl), a                      ; add current comtail ch
 FinaliseCmd             ld a, '$'                       ; $ terminate cmdbuf
                         ld (hl), a                      ;
 
-                        ld C, B$PRINTS                  ; print first token
+                        ld C, B_PRINTS                  ; print first token
                         ld DE, CMDBUFF                  ;
-                        CALL CPM_CMD                    ;
+                        CALL BDOS_CMD                   ;
                         RET                             ; RETURN TO THE CCP
-
-/*                      ld b,0                          ;  copy args and add $ terminator
-                        ld hl, COMTAIL$COUNT            ;
-                        ld c, (hl)                      ;
-                        ld hl, COMTAIL$CHARS            ;
-                        ld de, COPYCOMTAIL$CHARS        ;
-                        ldir                            ;
-                        ld hl, de                       ;
-                        ld a, '$'                       ;
-                        ld (hl), a                      ;
-                        ld b, 0                         ; print args and exit
-
-                        ld C, B$PRINTS                  ;
-                        ld DE, COPYCOMTAIL$CHARS        ;
-                        CALL CPM_CMD                    ;
-                        RET                             ; RETURN TO THE CCP
-*/
 
 NoArgs                  ld DE, NO_ARGS                  ; print usage message and exit
-                        ld C, B$PRINTS                  ;
-                        CALL CPM_CMD                    ;
+                        ld C, B_PRINTS                  ;
+                        CALL BDOS_CMD                   ;
                         RET                             ; RETURN TO THE CCP
 ; STRING CONSTANTS
 CMD_ADD                 defb "ADD"                      ; text of add command
@@ -108,8 +91,6 @@ NO_ARGS                 defb "usage: journal list|add [new journal entry text]$"
 
 ; VARS
 CMDBUFF                 defs $127                       ; copy of the command entered
-COPYCOMTAIL$CHARS       defs $127                       ; a copy of the space for commtail so we can $ terminate it
-
 AppEnd                  equ *                           ; We'll need to know how long the application is.
 
 
