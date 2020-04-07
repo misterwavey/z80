@@ -98,21 +98,21 @@ WriteEntry              ld de, ENTRYBUF                 ; populate entrybuf with
                         ld c, a                         ; bc = entry len
                         ldir                            ;
 
-                        ld c, B_SETDMA                  ;
+                        ld c, B_SETDMA                  ; point dma at our entry
                         ld de, ENTRYBUF                 ;
                         call BDOS_CMD                   ;
 
-                        ld de, FCB_DISK                 ;
+                        ld de, FCB_DISK                 ; write entrybuf
                         ld c, B_WRITESEQ                ;
                         call BDOS_CMD                   ;
-                        cp 0                            ;
-                        jp nz, FileWriteError           ;
+                        cp 0                            ; error writing?
+                        jp nz, FileWriteError           ; yes
 
                         ld de, FCB_DISK                 ;
-                        ld c, B_CLOSEF                  ;
+                        ld c, B_CLOSEF                  ; close file
                         call BDOS_CMD                   ;
-                        cp $FF                          ;
-                        jp z, FileCloseError            ;
+                        cp $FF                          ; error closing?
+                        jp z, FileCloseError            ; yes
 
                         ld de, OK                       ;
                         ld c, B_PRINTS                  ;
