@@ -42,8 +42,9 @@ B_CONOUT                equ 2                           ; BDOS FN 2  - wite byte
 B_PRINTS                equ 9                           ; BDOS FN 9  - write $ terminated string to console
 B_OPENF                 equ 15                          ; BDOS FN 15 - open file
 B_CLOSEF                equ 16                          ; BDOS FN 16 - close file
+B_READSEQ               equ 20                          ; BDOS FN 20 - read sequential record
+B_WRITESEQ              equ 21                          ; BDOS FN 21 - write sequential record
 B_CREATEF               equ 22                          ; BDOS FN 22 - create file
-B_WRITESEQ              equ 21                          ; BDOS FN 21 - write sequential file
 B_SETDMA                equ 26                          ; BDOS FN 26 - set DMA location
 
 ORG                     $100                            ; TRANSIENT PROGRAM AREA
@@ -80,16 +81,8 @@ AddEntry                inc de                          ; skip any leading space
                         ld a, (hl)                      ; a = comtail total len
                         sub b                           ; a = a - b = comtail entry len
                         push af                         ;
-OpenOrCreateFile        ld c, B_OPENF                   ;
-                        ld de, FCB_DISK                 ;
-                        call BDOS_CMD                   ;
-                        cp $ff                          ; a = ff -> file not found ?
-                        jp nz, WriteEntry               ; no
-                        ld c, B_CREATEF                 ; yes. create it
-                        ld de, FCB_DISK                 ;
-                        call BDOS_CMD                   ;
-                        cp $ff                          ; a = ff -> directory full?
-                        jp z, FileError                 ; yes
+                        call OpenOrCreateFile           ;
+                        call MoveToEndOfFile            ;
 
 WriteEntry              ld de, ENTRYBUF                 ; populate entrybuf with len(entry) chars
                         pop af                          ; a = comtail entry len
@@ -119,7 +112,61 @@ WriteEntry              ld de, ENTRYBUF                 ; populate entrybuf with
                         call BDOS_CMD                   ;
                         ret                             ; RETURN TO THE CCP
 
-ListEntries             nop                             ;
+ListEntries             call OpenOrCreateFile           ;
+                        ld c, B_SETDMA                  ; point dma at our entry
+                        ld de, ENTRYBUF                 ;
+                        call BDOS_CMD                   ;
+
+                        ld de, FCB_DISK                 ;
+                        ld c, B_READSEQ                 ; read record into entrybuf
+                        call BDOS_CMD                   ;
+                        cp 0                            ; a = 0 = successful?
+                        jp nz, NoEntries                ; no
+
+ListNext                ld de, ENTRY_HEADER             ; yes
+                        ld c, B_PRINTS                  ; print >
+                        call BDOS_CMD                   ;
+
+                        ld hl, ENTRYBUF-1               ;    move through loaded entry until the first $1a EOF char
+SkipToEofChar           inc hl                          ;
+                        ld a, (hl)                      ;
+                        cp $1a                          ;
+                        jp nz, SkipToEofChar            ;
+                        ld (hl), '$'                    ; and replace with $ terminator for printing
+
+                        ld de, ENTRYBUF                 ;
+                        ld c, B_PRINTS                  ; print entry
+                        call BDOS_CMD                   ;
+
+                        ld de, CR_CHAR                  ;
+                        ld c, B_PRINTS                  ; print CR
+                        call BDOS_CMD                   ;
+
+                        ld de, FCB_DISK                 ;
+                        ld c, B_READSEQ                 ; read record into entrybuf
+                        call BDOS_CMD                   ;
+                        cp 0                            ;  a = 0 = successful?
+                        jp z, ListNext                  ;  yes, keep reading
+
+                        ret                             ;
+
+OpenOrCreateFile        ld c, B_OPENF                   ;
+                        ld de, FCB_DISK                 ;
+                        call BDOS_CMD                   ;
+                        cp $ff                          ; a = ff -> file not found ?
+                        ret nz                          ; no. we're done so return
+                        ld c, B_CREATEF                 ; yes no file found. create it
+                        ld de, FCB_DISK                 ;
+                        call BDOS_CMD                   ;
+                        cp $ff                          ; a = ff -> directory full?
+                        jp z, FileError                 ; yes - err
+                        ret                             ; no -  return
+
+MoveToEndOfFile         ld de, FCB_DISK                 ;  read one record
+                        ld c, B_READSEQ                 ;
+                        call BDOS_CMD                   ;
+                        cp 0                            ;  a = 0 = successful?
+                        jp z, MoveToEndOfFile           ;  yes, keep reading
                         ret                             ;
 
 Showtoken               ld c, B_PRINTS                  ; print first token
@@ -147,6 +194,12 @@ FileCloseError          ld de, FILE_CLOSE_ERROR         ; print usage message an
                         call BDOS_CMD                   ;
                         ret                             ;
 
+NoEntries               ld de, NO_ENTRIES               ; print usage message and exit
+                        ld c, B_PRINTS                  ;
+                        call BDOS_CMD                   ;
+                        ret                             ;
+
+
 FCB_DISK                defb 0                          ; =FCB$FCB_DISK
 FCB_NAME                defb "JOURNAL "                 ;
 FCB_TYP                 defb "DAT"                      ;
@@ -156,7 +209,7 @@ FCB_RECUSED             defb 0                          ;
 FCB_ABUSED              defb 0,0,0,0,0,0,0,0            ;
                         defb 0,0,0,0,0,0,0,0            ;
 FCB_SEQREC              defb 0                          ;
-FCB_RANREC              defb 0                          ;
+FCB_RANREC              defw 0                          ;
 FCB_RANRECO             defb 0                          ;
 
 ; CMD values
@@ -168,7 +221,10 @@ NO_ARGS                 defb "usage: journal [+|-] [new journal entry text]$" ;
 FILE_ERROR              defb "Failed to open/create file$" ;
 FILE_WRITE_ERROR        defb "Failed to write file$"    ;
 FILE_CLOSE_ERROR        defb "Failed to close file$"    ;
+ENTRY_HEADER            defb "> $"                      ;
+NO_ENTRIES              defb "No journal entries exist. add with +$" ;
 OK                      defb "OK$"                      ;
+CR_CHAR                 defb 13,10,'$'                     ; <CR><LF>$
 
 ; VARS
 CMDBUF                  defb 0                          ; copy of the command entered
