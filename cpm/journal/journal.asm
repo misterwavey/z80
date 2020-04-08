@@ -73,23 +73,23 @@ AddEntry                inc de                          ; skip any leading space
                         jp z, AddEntry                  ;
                         ld hl, de                       ; hl = text entry
                         push hl                         ;
-                        ld bc, COMTAIL_CHARS            ; find length of tail rmaining
+
+                        ld bc, COMTAIL_CHARS            ; find length of tail remaining
                         or a                            ; clear carry for sbc
                         sbc hl, bc                      ; hl = hl - bc
                         ld b, l                         ; b = comtail header length
                         ld hl, COMTAIL_COUNT            ;
                         ld a, (hl)                      ; a = comtail total len
                         sub b                           ; a = a - b = comtail entry len
-                        push af                         ;
-                        call OpenOrCreateFile           ;
-                        call MoveToEndOfFile            ;
 
-WriteEntry              ld de, ENTRYBUF                 ; populate entrybuf with len(entry) chars
-                        pop af                          ; a = comtail entry len
+CopyEntry               ld de, ENTRYBUF                 ; populate entrybuf with len(entry) chars
                         pop hl                          ; hl = text entry
                         ld b, 0                         ;
                         ld c, a                         ; bc = entry len
                         ldir                            ;
+
+WriteEntry              call OpenOrCreateFile           ;
+                        call MoveToEndOfFile            ;
 
                         ld c, B_SETDMA                  ; point dma at our entry
                         ld de, ENTRYBUF                 ;
@@ -127,7 +127,7 @@ ListNext                ld de, ENTRY_HEADER             ; yes
                         ld c, B_PRINTS                  ; print >
                         call BDOS_CMD                   ;
 
-                        ld hl, ENTRYBUF-1               ;    move through loaded entry until the first $1a EOF char
+                        ld hl, ENTRYBUF-1               ; move through loaded entry until the first $1a EOF char
 SkipToEofChar           inc hl                          ;
                         ld a, (hl)                      ;
                         cp $1a                          ;
@@ -142,11 +142,15 @@ SkipToEofChar           inc hl                          ;
                         ld c, B_PRINTS                  ; print CR
                         call BDOS_CMD                   ;
 
+                        ld c, B_SETDMA                  ; point dma at our entry
+                        ld de, ENTRYBUF                 ;
+                        call BDOS_CMD                   ;
+
                         ld de, FCB_DISK                 ;
                         ld c, B_READSEQ                 ; read record into entrybuf
                         call BDOS_CMD                   ;
-                        cp 0                            ;  a = 0 = successful?
-                        jp z, ListNext                  ;  yes, keep reading
+                        cp 0                            ; a = 0 = successful?
+                        jp z, ListNext                  ; yes, keep reading
 
                         ret                             ;
 
@@ -224,7 +228,7 @@ FILE_CLOSE_ERROR        defb "Failed to close file$"    ;
 ENTRY_HEADER            defb "> $"                      ;
 NO_ENTRIES              defb "No journal entries exist. add with +$" ;
 OK                      defb "OK$"                      ;
-CR_CHAR                 defb 13,10,'$'                     ; <CR><LF>$
+CR_CHAR                 defb 13,10,'$'                  ; <CR><LF>$
 
 ; VARS
 CMDBUF                  defb 0                          ; copy of the command entered
