@@ -1,4 +1,6 @@
 ; standard zeus CP/M setup
+; see http://desdes.com/products/oldfiles/index.htm to download zeus(ish) (zeustest.exe at time of writing)
+; will also need the cpm sources file http://desdes.com/products/oldfiles/cpm_app.zip
 
 Zeus_cpm_drives         = "cpm_disks.bin"               ; Tell Zeus where the CP/M virtual disks are stored
 
@@ -17,22 +19,23 @@ Zeus_cpm_drives         = "cpm_disks.bin"               ; Tell Zeus where the CP
 BDOS_CMD                jp FBASE                        ; The CP/M command entry point
 
 
-; * * * * * * * * * * * * * * * *
-; *                             *
-; * start of JOURNAL.COM source *
-; *                             *
-; * * * * * * * * * * * * * * * *
+        ; * * * * * * * * * * * * * * * *
+        ; *                             *
+        ; * start of JOURNAL.COM source *
+        ; *                             *
+        ; * * * * * * * * * * * * * * * *
 
 
 ; parse args (add/list) (entry)
 ; if add
 ;     open file
-;     add entry [with timestamp]
+;     move to end of file
+;     add entry
 ;     close file
 ; else if list
 ;      open file
 ;      list entries
-;      close?
+;      close
 ; else error
 ;
 COMTAIL_COUNT           equ $0080                       ; our command's argument list length
@@ -77,9 +80,9 @@ AddEntryLoop            inc de                          ; skip any leading space
                         ld a, (de)                      ;
                         cp a, ' '                       ;
                         jp z, AddEntryLoop              ;
+
                         ld hl, de                       ; hl = text entry
                         push hl                         ;
-
                         ld bc, COMTAIL_CHARS            ; find length of tail remaining
                         or a                            ; clear carry for sbc
                         sbc hl, bc                      ; hl = hl - bc
@@ -146,10 +149,6 @@ SkipToEofChar           inc hl                          ;
 
                         ld de, CR_CHAR                  ;
                         ld c, B_PRINTS                  ; print CR
-                        call BDOS_CMD                   ;
-
-                        ld c, B_SETDMA                  ; point dma at our entry
-                        ld de, ENTRYBUF                 ;
                         call BDOS_CMD                   ;
 
                         ld de, FCB_DISK                 ;
@@ -242,11 +241,11 @@ ENTRYBUF                defs 128, $1a                   ; pre-populate buffer wi
 CMDBUF_LEN              defb 0                          ; length of cmdbuf
 AppEnd                  equ *                           ; We'll need to know how long the application is.
 
-; * * * * * * * * * * * * * * *
-; *                           *
-; * end of JOURNAL.COM source *
-; *                           *
-; * * * * * * * * * * * * * * *
+        ; * * * * * * * * * * * * * * *
+        ; *                           *
+        ; * end of JOURNAL.COM source *
+        ; *                           *
+        ; * * * * * * * * * * * * * * *
 
 
 ; Save this application as a CP/M file
@@ -256,8 +255,8 @@ AppEnd                  equ *                           ; We'll need to know how
 
 ; Now, we'll also include and build the CP/M source files while we're at it, so they can be single-stepped
 
-                        include "..\zeus\cpm22.asm"     ;
-                        include "..\zeus\cbios.asm"     ;
+                        include "..\zeus\cpm22.asm"     ;  assumes file can be found in relative directory
+                        include "..\zeus\cbios.asm"     ;  assumes file can be found in relative directory
 
 ; Setup the CP/M terminal colours
 
@@ -294,46 +293,4 @@ AppEnd                  equ *                           ; We'll need to know how
                         zeussyntaxhighlight 253, $22,$22,$aa ; Set the current editing line background colour
                         zeussyntaxhighlight 254, $00,$00,$00 ; Set the margin background colour
                         zeussyntaxhighlight 255, $00,$00,$00 ; Set the editor background colour
-
-; CopyUntilSpaceOrMax     ld (hl), a                      ; add current comtail char to cmdbuf[hl]
-;                        inc hl                          ;
-;                        push hl                         ; about to trash
-;                        ld bc, COMTAIL_CHARS            ; only proceed until we've exhaused char count
-;                        ld hl, de                       ;
-;                        or a                            ; clear carry for sbc
-;                        sbc hl, bc                      ; hl = hl - bc = how many chars we've processed
-;                        ld a, l                         ; a = low byte of hl
-;                        ld hl, COMTAIL_COUNT            ;
-;                        ld b, (hl)                      ; b = comtail char count
-;                        cp b                            ; is comtail char count same as our processed char count?
-;                        pop hl                          ; hl = cmdbuf[n]
-;                        jp z, CheckCmdToken             ; bail if we've met the char count
-;                        inc de                          ; otherwise continue until we see a space
-;                        ld a, (de)                      ;
-;                        cp a, ' '                       ;
-;                        jp nz, CopyUntilSpaceOrMax      ;
-;
-; CheckCmdToken           ld a, '$'                       ; $ terminate cmdbuf
-;                        ld (hl), a                      ;
-;                        inc de                          ; de = remainder of comtail
-;                        ld bc, hl                       ; bc = cmdbuf[n]
-;                        ld hl, CMDBUFF                  ; hl = cmdbuf
-;                        or a                            ; clear carry for sbc
-;                        sbc hl, bc                      ; hl = hl - bc
-;                        ld c, l                         ; c = len(cmdbuf)
-;                        ld hl, CMDBUFF-1                ; start of command
-;                        ld de, CMD_ADD-1                ; start of add command
-;                        ld a, 0                         ; count down to 0
-; CheckNextChar           inc hl                          ; cmdbuf[n+1]
-;                        inc de                          ; CMD_ADD[n+1]
-;                        dec c                           ; count--
-;                        cp c                            ; count = 0?
-;                        jp z, NoMoreChars               ;
-;                        ld b, (hl)                      ;
-;                        ld a, (de)                      ;
-;                        cp b                            ;
-;                        jp z, CheckNextChar             ;
-;                        jp NoArgs                       ;
-;
-; NoMoreChars             nop
 
