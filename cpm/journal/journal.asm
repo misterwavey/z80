@@ -67,10 +67,16 @@ SkipLeadingSpaces       inc de                          ;
                         jp z, ListEntries               ; yes
                         jp ShowUsage                    ; else err
 
-AddEntry                inc de                          ; skip any leading spaces of the remainder of the arguments
+
+AddEntry                ld hl, COMTAIL_COUNT            ; check comtail for arguments
+                        ld a, (hl)                      ;
+                        cp 4                            ;
+                        jp c, ShowUsage                 ;
+
+AddEntryLoop            inc de                          ; skip any leading spaces of the remainder of the arguments
                         ld a, (de)                      ;
                         cp a, ' '                       ;
-                        jp z, AddEntry                  ;
+                        jp z, AddEntryLoop              ;
                         ld hl, de                       ; hl = text entry
                         push hl                         ;
 
